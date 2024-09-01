@@ -1,0 +1,15 @@
+.DS_Store
+.ruff_cache
+
+.env
+.venv
+
+lightning_logs
+wandb_logs
+out
+
+*.ckpt
+*.db
+*.o
+*.out
+*.pyc

@@ -1,0 +1,50 @@
+[tool.poetry]
+name = "mlsae"
+version = "0.1.0"
+description = "Multi-Layer Sparse Autoencoders"
+authors = ["Tim Lawson <hello@timlawson.dev>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+datasets = "^2.20.0"
+einops = "^0.8.0"
+fastapi = "^0.111.1"
+huggingface-hub = { extras = ["cli"], version = "^0.23.5" }
+jaxtyping = "^0.2.33"
+lightning = "^2.3.3"
+loguru = "^0.7.2"
+matplotlib = "^3.9.1"
+orjson = "^3.10.6"
+pydantic = "^2.8.2"
+pytest = "^8.3.2"
+python = "^3.12"
+simple-parsing = "^0.1.5"
+torch = "^2.4.0"
+transformers = "^4.42.4"
+triton = { version = "^3.0.0", optional = true }
+uvicorn = { extras = ["standard"], version = "^0.30.3" }
+wandb = "^0.17.4"
+zstandard = "^0.23.0"
+
+[tool.poetry.extras]
+triton = ["triton"]
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.5.2"
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q"
+testpaths = ["tests"]
+
+[tool.ruff]
+extend-include = ["*.ipynb"]
+target-version = "py312"
+
+[tool.ruff.lint]
+ignore = ["F722", "F821", "UP037"]
+select = ["E", "F", "UP", "B", "SIM", "I"]
+
+[build-system]
+build-backend = "poetry.core.masonry.api"
+requires = ["poetry-core"]

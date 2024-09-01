@@ -1,0 +1,46 @@
+{
+  "extends": ["next/core-web-vitals", "prettier"],
+  "rules": {
+    "sort-imports": [
+      "error",
+      {
+        "ignoreDeclarationSort": true
+      }
+    ],
+    "import/consistent-type-specifier-style": "error",
+    "import/no-duplicates": ["error", { "prefer-inline": true }],
+    "import/order": [
+      "warn",
+      {
+        "alphabetize": {
+          "caseInsensitive": false,
+          "order": "asc",
+          "orderImportKind": "asc"
+        },
+        "groups": [
+          "builtin",
+          "type",
+          "external",
+          "internal",
+          "parent",
+          "sibling",
+          "object",
+          "index"
+        ],
+        "pathGroups": [
+          {
+            "pattern": "~/**",
+            "group": "external",
+            "position": "after"
+          }
+        ],
+        "pathGroupsExcludedImportTypes": ["builtin"]
+      }
+    ]
+  },
+  "settings": {
+    "import/resolver": {
+      "typescript": {}
+    }
+  }
+}
