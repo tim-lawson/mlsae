@@ -67,7 +67,7 @@ class ExamplesRequest(BaseModel):
 
 @app.post("/api/py/examples")
 async def examples(body: ExamplesRequest) -> list[Example]:
-    return analyser.examples(body.layer, body.latent)
+    return analyser.latent_examples(body.layer, body.latent)
 
 
 class PromptRequest(BaseModel):

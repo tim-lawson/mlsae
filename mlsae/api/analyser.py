@@ -110,7 +110,7 @@ class Analyser:
             metrics=metrics,
         )
 
-    def examples(self, layer: int, latent: int) -> list[Example]:
+    def latent_examples(self, layer: int, latent: int) -> list[Example]:
         """Find the maximally activating examples for the specified latent and layer."""
 
         return [

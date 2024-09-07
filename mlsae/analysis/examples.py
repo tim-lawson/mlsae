@@ -1,4 +1,5 @@
 import json
+import os
 import sqlite3
 from collections.abc import Generator
 from dataclasses import dataclass
@@ -9,6 +10,7 @@ from typing import NamedTuple
 import einops
 import torch
 from datasets import Dataset, DatasetDict, load_dataset
+from loguru import logger
 from simple_parsing import Serializable, field, parse
 from tqdm import tqdm
 
@@ -39,6 +41,9 @@ class Config(Serializable):
 
     delete_every_n_steps: int = 10
     """The number of steps between deleting examples not in the top n_examples."""
+
+    push_to_hub: bool = True
+    """Whether to push the dataset to HuggingFace."""
 
 
 class Example(NamedTuple):
@@ -93,20 +98,22 @@ class Example(NamedTuple):
 class Examples:
     conn: sqlite3.Connection
 
-    def __init__(
-        self,
-        repo_id: str,
-    ):
-        self.repo_id = get_examples_repo_id(repo_id)
-        self.database = repo_id.split("/")[-1] + ".db"
-        if Path(self.database).exists():
-            self.conn = sqlite3.connect(self.database)
+    def __init__(self, repo_id: str) -> None:
+        repo_id = Examples.repo_id(repo_id)
+        filename = Examples.filename(repo_id)
+
+        if Path(filename).exists():
+            logger.info(f"connecting to database: {filename}")
+            self.conn = sqlite3.connect(filename)
+
         else:
-            dataset = load_dataset(self.repo_id)
+            logger.info(f"loading dataset: {repo_id}")
+            dataset = load_dataset(repo_id)
             assert isinstance(dataset, DatasetDict)
             dataset = dataset["train"]
 
-            self.conn, cursor = create_db(self.database)
+            logger.info(f"creating database: {filename}")
+            self.conn, cursor = create_db(filename)
             batch = []
             for i, example in tqdm(enumerate(dataset.to_list())):
                 batch.append(Example.from_dict(example))
@@ -116,10 +123,22 @@ class Examples:
                     batch = []
             insert_examples(cursor, batch)
             self.conn.commit()
-            batch = []
 
     def get(self, layer: int, latent: int) -> list[Example]:
         return select_examples(self.conn.cursor(), latent, layer)
+
+    @staticmethod
+    def repo_id(repo_id: str) -> str:
+        if repo_id.endswith("-examples"):
+            return repo_id
+        if repo_id.endswith("-tfm"):
+            return repo_id.replace("-tfm", "-examples")
+        return repo_id + "-examples"
+
+    @staticmethod
+    def filename(repo_id: str) -> str:
+        os.makedirs("out", exist_ok=True)
+        return os.path.join("out", f"{Examples.repo_id(repo_id).replace('/', '-')}.db")
 
 
 def get_examples(
@@ -243,23 +262,15 @@ def select_examples(cursor: sqlite3.Cursor, latent: int, layer: int) -> list[Exa
     return [Example.from_row(row) for row in cursor.fetchall()]
 
 
-def get_examples_repo_id(repo_id: str) -> str:
-    if repo_id.endswith("-examples"):
-        return repo_id
-    if repo_id.endswith("-tfm"):
-        return repo_id.replace("-tfm", "-examples")
-    return repo_id + "-examples"
-
-
 @torch.no_grad()
 def save_examples(config: Config, device: torch.device | str = "cpu") -> None:
     model = MLSAETransformer.from_pretrained(config.repo_id).to(device)
     data = DataModule(model_name=model.model_name, config=config.data)
     data.setup()
-    conn, cursor = create_db(config.repo_id.split("/")[-1] + ".db")
 
+    conn, cursor = create_db(Examples.filename(config.repo_id))
     batch: dict[str, torch.Tensor]
-    for i, batch in enumerate(tqdm(data._dataloader(), total=config.data.max_steps)):
+    for i, batch in tqdm(enumerate(data._dataloader()), total=config.data.max_steps):
         examples = list(get_examples(model, batch, config.n_tokens, device=device))
         insert_examples(cursor, examples)
         if i > config.data.max_steps:
@@ -270,10 +281,11 @@ def save_examples(config: Config, device: torch.device | str = "cpu") -> None:
     delete_examples(cursor, config.n_examples)
     conn.commit()
 
-    repo_id = get_examples_repo_id(config.repo_id)
-    dataset = Dataset.from_sql("SELECT * FROM examples", conn)
-    assert isinstance(dataset, Dataset)
-    dataset.push_to_hub(repo_id, commit_description=config.dumps_json())
+    if config.push_to_hub:
+        repo_id = Examples.repo_id(config.repo_id)
+        dataset = Dataset.from_sql("SELECT * FROM examples", conn)
+        assert isinstance(dataset, Dataset)
+        dataset.push_to_hub(repo_id, commit_description=config.dumps_json())
 
 
 if __name__ == "__main__":
