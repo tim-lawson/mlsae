@@ -3,8 +3,11 @@ from collections.abc import Generator
 from dataclasses import dataclass
 from functools import cached_property
 
+import numpy as np
+import pandas as pd
 import torch
 from datasets import Dataset, DatasetDict, load_dataset
+from loguru import logger
 from safetensors.torch import load_file, save_file
 from simple_parsing import Serializable, field, parse
 from tqdm import tqdm
@@ -28,6 +31,12 @@ class Config(Serializable):
     seed: int = 42
     """The seed for global random state."""
 
+    log_every_n_steps: int | None = None
+    """The number of steps between logging statistics."""
+
+    push_to_hub: bool = True
+    """Whether to push the dataset to HuggingFace."""
+
 
 class Metric:
     def __init__(
@@ -38,6 +47,7 @@ class Metric:
         self.counts = torch.zeros((n_layers, n_latents), device=device)
         self.totals = torch.zeros((n_layers, n_latents), device=device)
         self.layers = torch.arange(n_layers, device=device).unsqueeze(1)
+        self.device = device
 
     def update(self, x: TopK) -> None:
         for layer in range(self.n_layers):
@@ -51,20 +61,58 @@ class Metric:
         return dict(counts=self.counts, totals=self.totals)
 
 
+def get_stats(layer_std: torch.Tensor) -> dict[str, float]:
+    values = layer_std.cpu().numpy()
+    std = np.nanstd(values).item()
+    return {
+        "mean": np.nanmean(values).item(),
+        "var": np.nanvar(values).item(),
+        "std": std,
+        "sem": std / np.sqrt(len(values)),
+    }
+
+
 @torch.no_grad()
 def get_tensors(
     config: Config, device: torch.device | str = "cpu"
 ) -> dict[str, torch.Tensor]:
     model = MLSAETransformer.from_pretrained(config.repo_id).to(device)
+
     data = DataModule(model_name=model.model_name, config=config.data)
     data.setup()
+    tokens_per_step = config.data.batch_size * config.data.max_length
+
     metric = Metric(model.n_layers, model.n_latents, device)
+    rows: list[dict[str, str | int | float]] = []
+
     for i, batch in enumerate(tqdm(data._dataloader(), total=config.data.max_steps)):
         inputs = model.transformer.forward(batch["input_ids"].to(device))
         topk = model.autoencoder.encode(inputs).topk
         metric.update(topk)
+
+        if config.log_every_n_steps is not None and i % config.log_every_n_steps == 0:
+            dists = Dists.from_tensors(metric.compute(), metric.device)
+            rows.append(
+                {
+                    "model_name": model.model_name,
+                    "n_layers": model.n_layers,
+                    "n_latents": model.n_latents,
+                    "expansion_factor": model.expansion_factor,
+                    "k": model.k,
+                    "step": i,
+                    "tokens": (i + 1) * tokens_per_step,
+                    **get_stats(dists.layer_std),
+                }
+            )
+
         if i > config.data.max_steps:
             break
+
+    if len(rows) > 0:
+        pd.DataFrame(rows).to_csv(
+            os.path.join("out", "dists_layer_std_step.csv"), index=False
+        )
+
     return metric.compute()
 
 
@@ -136,6 +184,15 @@ class Dists:
             }
 
     @staticmethod
+    def load(repo_id: str, device: torch.device | str | int) -> "Dists":
+        repo_id = Dists.repo_id(repo_id)
+        try:
+            filename = Dists.filename(repo_id)
+            return Dists.from_file(filename, str(device))
+        except Exception:
+            return Dists.from_hub(repo_id, str(device))
+
+    @staticmethod
     def from_tensors(
         tensors: dict[str, torch.Tensor], device: torch.device | str | int = "cpu"
     ) -> "Dists":
@@ -164,55 +221,46 @@ class Dists:
 
     @staticmethod
     def from_hub(repo_id: str, device: torch.device | str | int = "cpu") -> "Dists":
-        dataset = load_dataset(get_dists_repo_id(repo_id))
+        dataset = load_dataset(Dists.repo_id(repo_id))
         assert isinstance(dataset, DatasetDict)
         return Dists.from_dataset(dataset["train"], device)
 
+    @staticmethod
+    def repo_id(repo_id: str) -> str:
+        if repo_id.endswith("-dists"):
+            logger.warning(f"repo_id {repo_id} already ends with '-dists'")
+            return repo_id
+        if repo_id.endswith("-tfm"):
+            return repo_id.replace("-tfm", "-dists")
+        return repo_id + "-dists"
 
-def get_dists_repo_id(repo_id: str) -> str:
-    if repo_id.endswith("-dists"):
-        return repo_id
-    if repo_id.endswith("-tfm"):
-        return repo_id.replace("-tfm", "-dists")
-    return repo_id + "-dists"
-
-
-def get_dists_filename(repo_id: str) -> str:
-    os.makedirs("out", exist_ok=True)
-    return os.path.join(
-        "out", f"{get_dists_repo_id(repo_id).replace('/', '-')}.safetensors"
-    )
-
-
-def get_dists(repo_id: str, device: torch.device | str | int) -> Dists:
-    repo_id = get_dists_repo_id(repo_id)
-    try:
-        filename = get_dists_filename(repo_id)
-        return Dists.from_file(filename, str(device))
-    except Exception:
-        return Dists.from_hub(repo_id, str(device))
+    @staticmethod
+    def filename(repo_id: str) -> str:
+        os.makedirs("out", exist_ok=True)
+        return os.path.join(
+            "out", f"{Dists.repo_id(repo_id).replace('/', '-')}.safetensors"
+        )
 
 
-def main(config: Config, device: torch.device | str = "cpu") -> None:
+def save_dists(config: Config, device: torch.device | str = "cpu") -> None:
     tensors = get_tensors(config, device)
-
-    repo_id = get_dists_repo_id(config.repo_id)
-    filename = get_dists_filename(repo_id)
+    repo_id = Dists.repo_id(config.repo_id)
+    filename = Dists.filename(repo_id)
 
     save_file(tensors, filename)
+    _test = Dists.from_tensors(tensors, device)
+    _test = Dists.from_file(filename, device)
 
-    dataset = Dataset.from_generator(Dists(tensors).__iter__)
-    assert isinstance(dataset, Dataset)
-    dataset.push_to_hub(repo_id, commit_description=config.dumps_json())
-
-    _dists = Dists.from_tensors(tensors, device)
-    _dists = Dists.from_file(filename, device)
-    _dists = Dists.from_dataset(dataset, device)
-    _dists = Dists.from_hub(repo_id, device)
+    if config.push_to_hub:
+        dataset = Dataset.from_generator(Dists(tensors).__iter__)
+        assert isinstance(dataset, Dataset)
+        dataset.push_to_hub(repo_id, commit_description=config.dumps_json())
+        _test = Dists.from_dataset(dataset, device)
+        _test = Dists.from_hub(repo_id, device)
 
 
 if __name__ == "__main__":
     device = get_device()
     config = parse(Config)
     initialize(config.seed)
-    main(config, device)
+    save_dists(config, device)
