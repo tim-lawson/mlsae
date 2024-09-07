@@ -1,10 +1,9 @@
 import os
 
-import numpy as np
 import pandas as pd
 from simple_parsing import parse
 
-from mlsae.analysis.dists import get_dists
+from mlsae.analysis.dists import Dists, get_stats
 from mlsae.trainer import SweepConfig, initialize
 from mlsae.utils import get_device, get_repo_id
 
@@ -15,20 +14,15 @@ if __name__ == "__main__":
 
     rows: list[dict[str, str | int | float]] = []
     for model_name, expansion_factor, k in config:
-        repo_id = get_repo_id(model_name, expansion_factor, k, True)
-        dist = get_dists(repo_id, device)
-        layer_std = dist.layer_std.cpu().numpy()
+        dists = Dists.load(get_repo_id(model_name, expansion_factor, k, True), device)
         rows.append(
             {
                 "model_name": model_name,
-                "n_layers": dist.n_layers,
-                "n_latents": dist.n_latents,
+                "n_layers": dists.n_layers,
+                "n_latents": dists.n_latents,
                 "expansion_factor": expansion_factor,
                 "k": k,
-                "mean": np.nanmean(layer_std).item(),
-                "var": np.nanvar(layer_std).item(),
-                "std": np.nanstd(layer_std).item(),
-                "sem": np.nanstd(layer_std).item() / np.sqrt(len(layer_std)),
+                **get_stats(dists.layer_std),
             }
         )
     pd.DataFrame(rows).to_csv(os.path.join("out", "dists_layer_std.csv"), index=False)

@@ -5,7 +5,7 @@ from matplotlib import pyplot as plt
 from matplotlib.colors import Colormap
 from simple_parsing import parse
 
-from mlsae.analysis.dists import get_dists
+from mlsae.analysis.dists import Dists
 from mlsae.model import MLSAE
 from mlsae.trainer.config import SweepConfig
 from mlsae.utils import get_device, normalize
@@ -20,12 +20,12 @@ def get_dists_cos_sim(
     W_dec = normalize(W_dec)
 
     # Sort latents in descending order of mean layer
-    dist = get_dists(repo_id, device)
-    _, indices = dist.layer_mean.sort(descending=True)
+    dists = Dists.load(repo_id, device)
+    _, indices = dists.layer_mean.sort(descending=True)
     W_dec = W_dec[:, indices]
 
     # Pairwise differences between mean layers
-    layer_mean = dist.layer_mean.view(-1, 1) - dist.layer_mean.view(1, -1)
+    layer_mean = dists.layer_mean.view(-1, 1) - dists.layer_mean.view(1, -1)
 
     # Pairwise cosine similarities between decoder weight vectors
     cos_sim = torch.mm(W_dec.T, W_dec)
