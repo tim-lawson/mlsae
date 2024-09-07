@@ -3,11 +3,12 @@ import sqlite3
 from collections.abc import Generator
 from dataclasses import dataclass
 from os import PathLike
+from pathlib import Path
 from typing import NamedTuple
 
 import einops
 import torch
-from datasets import Dataset
+from datasets import Dataset, DatasetDict, load_dataset
 from simple_parsing import Serializable, field, parse
 from tqdm import tqdm
 
@@ -43,24 +44,82 @@ class Config(Serializable):
 class Example(NamedTuple):
     latent: int
     layer: int
-    token_id: torch.Tensor
+    token_id: int
     token: str
-    act: torch.Tensor
+    act: float
     token_ids: list[int]
-    tokens: list[str] | str
-    acts: torch.Tensor
+    tokens: list[str]
+    acts: list[float]
 
     def serialize(self) -> tuple[int | str | float, ...]:
         return (
             self.latent,
             self.layer,
-            self.token_id.item(),
+            self.token_id,
             self.token,
-            self.act.item(),
+            self.act,
             json.dumps(self.token_ids),
             json.dumps(self.tokens),
-            json.dumps(self.acts.tolist()),
+            json.dumps(self.acts),
         )
+
+    @staticmethod
+    def from_row(row: tuple) -> "Example":
+        return Example(
+            row[0],
+            row[1],
+            row[2],
+            row[3],
+            row[4],
+            json.loads(row[5]),
+            json.loads(row[6]),
+            json.loads(row[7]),
+        )
+
+    @staticmethod
+    def from_dict(data: dict) -> "Example":
+        return Example(
+            data["latent"],
+            data["layer"],
+            data["token_id"],
+            data["token"],
+            data["act"],
+            json.loads(data["token_ids"]),
+            json.loads(data["tokens"]),
+            json.loads(data["acts"]),
+        )
+
+
+class Examples:
+    conn: sqlite3.Connection
+
+    def __init__(
+        self,
+        repo_id: str,
+    ):
+        self.repo_id = get_examples_repo_id(repo_id)
+        self.database = repo_id.split("/")[-1] + ".db"
+        if Path(self.database).exists():
+            self.conn = sqlite3.connect(self.database)
+        else:
+            dataset = load_dataset(self.repo_id)
+            assert isinstance(dataset, DatasetDict)
+            dataset = dataset["train"]
+
+            self.conn, cursor = create_db(self.database)
+            batch = []
+            for i, example in tqdm(enumerate(dataset.to_list())):
+                batch.append(Example.from_dict(example))
+                if i % 1000 == 0:
+                    insert_examples(cursor, batch)
+                    self.conn.commit()
+                    batch = []
+            insert_examples(cursor, batch)
+            self.conn.commit()
+            batch = []
+
+    def get(self, layer: int, latent: int) -> list[Example]:
+        return select_examples(self.conn.cursor(), latent, layer)
 
 
 def get_examples(
@@ -82,17 +141,21 @@ def get_examples(
     for layer, pos, k, latent in torch.stack(
         [layers, positions, indices, batch_latents[layers, positions, indices]], dim=1
     ).tolist():
-        token_id = batch_tokens[pos]
+        token_id = int(batch_tokens[pos].item())
         token = model.transformer.tokenizer.decode(token_id)
-        act = batch_acts[layer, pos, k]
+        act = batch_acts[layer, pos, k].item()
 
         token_ids = batch_tokens[pos - n_tokens : pos + n_tokens].tolist()
-        tokens = model.transformer.tokenizer.convert_ids_to_tokens(token_ids)
-        acts = torch.where(
-            batch_latents[layer, pos - n_tokens : pos + n_tokens] == latent,
-            batch_acts[layer, pos - n_tokens : pos + n_tokens],
-            0.0,
-        ).sum(dim=-1)
+        tokens: list[str] = model.transformer.tokenizer.convert_ids_to_tokens(token_ids)  # type: ignore
+        acts = (
+            torch.where(
+                batch_latents[layer, pos - n_tokens : pos + n_tokens] == latent,
+                batch_acts[layer, pos - n_tokens : pos + n_tokens],
+                0.0,
+            )
+            .sum(dim=-1)
+            .tolist()
+        )
 
         yield Example(latent, layer, token_id, token, act, token_ids, tokens, acts)
 
@@ -157,6 +220,27 @@ def delete_examples(cursor: sqlite3.Cursor, n_examples: int) -> None:
         """,
         (n_examples,),
     )
+
+
+def select_examples(cursor: sqlite3.Cursor, latent: int, layer: int) -> list[Example]:
+    cursor.execute(
+        """
+        SELECT latent,
+        layer,
+        token_id,
+        token,
+        act,
+        token_ids,
+        tokens,
+        acts
+        FROM examples
+        WHERE layer = ?
+        AND latent = ?
+        ORDER BY act DESC
+        """,
+        (layer, latent),
+    )
+    return [Example.from_row(row) for row in cursor.fetchall()]
 
 
 def get_examples_repo_id(repo_id: str) -> str:

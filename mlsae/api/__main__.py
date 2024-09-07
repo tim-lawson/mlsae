@@ -11,7 +11,14 @@ from mlsae.trainer import initialize
 from mlsae.utils import get_device
 
 from .analyser import Analyser
-from .models import LatentActivations, LayerHistograms, LogitChanges, MaxLogits, Token
+from .models import (
+    Example,
+    LatentActivations,
+    LayerHistograms,
+    LogitChanges,
+    MaxLogits,
+    Token,
+)
 
 
 @dataclass
@@ -51,6 +58,16 @@ app.add_middleware(
 @app.get("/api/py/params")
 async def params() -> dict:
     return analyser.params()
+
+
+class ExamplesRequest(BaseModel):
+    layer: int
+    latent: int
+
+
+@app.post("/api/py/examples")
+async def examples(body: ExamplesRequest) -> list[Example]:
+    return analyser.examples(body.layer, body.latent)
 
 
 class PromptRequest(BaseModel):

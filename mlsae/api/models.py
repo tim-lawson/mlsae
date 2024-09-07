@@ -45,3 +45,14 @@ class LayerHistograms(BaseModel):
     """The histogram values for each layer."""
     edges: list[float]
     """The histogram edges across all layers."""
+
+
+class Example(BaseModel):
+    latent: int
+    layer: int
+    token_id: int
+    token: str
+    act: float
+    token_ids: list[int]
+    tokens: list[str]
+    acts: list[float]

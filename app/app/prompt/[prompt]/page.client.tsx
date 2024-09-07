@@ -2,6 +2,7 @@
 
 import React from "react";
 import Controls from "~/app/components/Controls";
+import LatentExamples from "~/app/components/LatentExamples";
 import PromptActivations from "~/app/components/prompt/PromptActivations";
 import PromptLatentHeatmaps from "~/app/components/prompt/PromptLatentHeatmaps";
 import PromptLayerHistograms from "~/app/components/prompt/PromptLayerHistograms";
@@ -66,6 +67,7 @@ export default function Page({
         <TabsList className="">
           <TabsTrigger value="histogram">Histograms</TabsTrigger>
           <TabsTrigger value="heatmap">Heatmaps</TabsTrigger>
+          <TabsTrigger value="example">Examples</TabsTrigger>
           <TabsTrigger value="logit">Logits</TabsTrigger>
         </TabsList>
         <TabsContent
@@ -84,6 +86,16 @@ export default function Page({
             stateLayer={stateLayer}
             statePosition={statePosition}
             threshold={threshold}
+          />
+        </TabsContent>
+        <TabsContent
+          value="example"
+          className="mt-2 max-h-[calc(100vh-20.5rem)] overflow-y-auto"
+        >
+          <LatentExamples
+            className="w-[calc(100vw-2rem)]"
+            stateLatent={stateLatent}
+            stateLayer={stateLayer}
           />
         </TabsContent>
         <TabsContent
