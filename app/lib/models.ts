@@ -34,8 +34,21 @@ export const layerHistogramsSchema = z.object({
   edges: z.array(z.number()),
 });
 
+export const latentExampleSchema = z.object({
+  latent: z.number().int(),
+  layer: z.number().int(),
+  token_id: z.number().int(),
+  token: z.string(),
+  act: z.number(),
+  token_ids: z.array(z.number().int()),
+  tokens: z.array(z.string()),
+  acts: z.array(z.number()),
+});
+
 export type TokenType = z.infer<typeof tokenSchema>;
 export type LogitType = z.infer<typeof logitSchema>;
 export type MaxLogitsType = z.infer<typeof maxLogitsSchema>;
+export type LogitChangesType = z.infer<typeof logitChangesSchema>;
 export type LatentActivationsType = z.infer<typeof latentActivationsSchema>;
 export type LayerHistogramsType = z.infer<typeof layerHistogramsSchema>;
+export type LatentExampleType = z.infer<typeof latentExampleSchema>;

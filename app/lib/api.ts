@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   latentActivationsSchema,
+  latentExampleSchema,
   layerHistogramsSchema,
   logitChangesSchema,
   maxLogitsSchema,
@@ -97,4 +98,16 @@ export async function getPromptLogitsSteer(
   });
   const data: unknown = await response.json();
   return z.tuple([maxLogitsSchema, logitChangesSchema]).parse(data);
+}
+
+export async function getExamples(latent: number, layer: number) {
+  const response = await fetch(`${API_URL}/examples`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ latent, layer }),
+  });
+  const data: unknown = await response.json();
+  return z.array(latentExampleSchema).parse(data);
 }

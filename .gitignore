@@ -10,6 +10,7 @@ out
 
 *.ckpt
 *.db
+*.db-journal
 *.o
 *.out
 *.pyc

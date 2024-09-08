@@ -45,3 +45,22 @@ class LayerHistograms(BaseModel):
     """The histogram values for each layer."""
     edges: list[float]
     """The histogram edges across all layers."""
+
+
+class Example(BaseModel):
+    latent: int
+    "The latent index."
+    layer: int
+    "The layer index."
+    token_id: int
+    """The token id for the maximum activation."""
+    token: str
+    """The token string for the maximum activation."""
+    act: float
+    """The maximum activation value."""
+    token_ids: list[int]
+    """The token ids around the maximum."""
+    tokens: list[str]
+    """The token strings around the maximum."""
+    acts: list[float]
+    """The activation values around the maximum."""

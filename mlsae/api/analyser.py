@@ -13,7 +13,9 @@ from loguru import logger
 from pydantic import BaseModel
 from torch import Tensor
 
+from mlsae.analysis.examples import Examples
 from mlsae.api.models import (
+    Example,
     LatentActivations,
     LayerHistograms,
     Logit,
@@ -67,6 +69,8 @@ class Analyser:
 
         self.default_params = default_params or DefaultParams()
 
+        self.examples = Examples(repo_id)
+
     def params(self) -> dict:
         return self.model.hparams_initial
 
@@ -105,6 +109,23 @@ class Analyser:
             recons=recons.squeeze(),
             metrics=metrics,
         )
+
+    def latent_examples(self, layer: int, latent: int) -> list[Example]:
+        """Find the maximally activating examples for the specified latent and layer."""
+
+        return [
+            Example(
+                latent=example.latent,
+                layer=example.layer,
+                token_id=example.token_id,
+                token=example.token,
+                act=example.act,
+                token_ids=example.token_ids,
+                tokens=[replace_special(token) for token in example.tokens],
+                acts=example.acts,
+            )
+            for example in self.examples.get(layer, latent)
+        ]
 
     def prompt_tokens(self, prompt: str) -> list[Token]:
         """Tokenize the specified prompt."""
