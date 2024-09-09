@@ -1,6 +1,7 @@
 # Residual Stream Analysis with Multi-Layer SAEs
 
-> [!NOTE] This repository accompanies the preprint Residual Stream Analysis with
+> [!NOTE]
+> This repository accompanies the preprint Residual Stream Analysis with
 > Multi-Layer SAEs: <https://arxiv.org/abs/2409.04185>. See
 > [References](#references) for related work.
 
