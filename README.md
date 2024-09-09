@@ -1,4 +1,4 @@
-# Residual Stream Analysis with Multi-Layer SAEs
+# Multi-Layer Sparse Autoencoders (MLSAE)
 
 > [!NOTE]
 > This repository accompanies the preprint Residual Stream Analysis with
