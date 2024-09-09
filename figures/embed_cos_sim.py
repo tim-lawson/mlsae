@@ -69,6 +69,7 @@ if __name__ == "__main__":
     config = parse(Config)
     device = get_device()
     initialize(config.seed)
+    os.makedirs("out", exist_ok=True)
 
     rows: list[dict[str, str | int | float]] = []
     for model_name, expansion_factor, k in config:

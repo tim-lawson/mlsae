@@ -9,6 +9,7 @@ from mlsae.utils import get_device
 
 if __name__ == "__main__":
     device = get_device()
+    os.makedirs("out", exist_ok=True)
     for repo_id in parse(SweepConfig).repo_ids():
         dists = Dists.load(repo_id, device)
         filename = f"dists_heatmap_{repo_id.split('/')[-1]}.pdf"

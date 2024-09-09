@@ -56,6 +56,7 @@ def save_heatmap(
 
 if __name__ == "__main__":
     device = get_device()
+    os.makedirs("out", exist_ok=True)
     for repo_id in parse(SweepConfig).repo_ids(transformer=False):
         filename = f"dists_cos_sim_heatmap_{repo_id.split('/')[-1]}.pdf"
         x, y = get_dists_cos_sim(repo_id, device)

@@ -43,6 +43,7 @@ def get_data(config: Config, repo_id: str, device: torch.device | str) -> torch.
 if __name__ == "__main__":
     device = get_device()
     config = parse(Config)
+    os.makedirs("out", exist_ok=True)
     for repo_id in config.repo_ids():
         filename = f"prompt_heatmap_{repo_id.split('/')[-1]}.pdf"
         data = get_data(config, repo_id, device)

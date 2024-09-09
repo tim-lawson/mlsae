@@ -102,4 +102,5 @@ if __name__ == "__main__":
     config = parse(RunConfig)
     device = get_device()
     initialize(config.seed)
+    os.makedirs("out", exist_ok=True)
     main(config, device)
