@@ -12,6 +12,7 @@ from jaxtyping import Float, Int
 from loguru import logger
 from pydantic import BaseModel
 from torch import Tensor
+from tuned_lens import TunedLens
 
 from mlsae.analysis.examples import Examples
 from mlsae.api.models import (
@@ -68,6 +69,11 @@ class Analyser:
         self.tokenizer = self.model.transformer.tokenizer
 
         self.default_params = default_params or DefaultParams()
+
+        self.tuned_lens = TunedLens.from_model_and_pretrained(
+            self.model.transformer.model, self.model.model_name, map_location=device
+        )
+        self.tuned_lens.to(device)
 
         self.examples = None
         try:
@@ -247,8 +253,8 @@ class Analyser:
 
         start_at_layer = layer or self.transformer.model.config.num_hidden_layers - 1
 
-        logits = self.transformer.forward_at_layer(
-            x.unsqueeze(1), start_at_layer, return_type="logits"
+        logits = self.tuned_lens.forward(
+            x[start_at_layer, ...].unsqueeze(1), start_at_layer
         ).squeeze()
 
         return LogitsProbs(logits=logits, probs=F.softmax(logits, dim=-1))
