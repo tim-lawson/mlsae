@@ -31,7 +31,7 @@ class Config(Serializable):
     seed: int = 42
     """The seed for global random state."""
 
-    log_every_n_steps: int | None = None
+    log_every_n_steps: int | None = 64
     """The number of steps between logging statistics."""
 
     push_to_hub: bool = True
@@ -109,8 +109,9 @@ def get_tensors(
             break
 
     if len(rows) > 0:
+        repo_id = config.repo_id.split("/")[-1]
         pd.DataFrame(rows).to_csv(
-            os.path.join("out", "dists_layer_std_step.csv"), index=False
+            os.path.join("out", f"dists_layer_std_{repo_id}.csv"), index=False
         )
 
     return metric.compute()

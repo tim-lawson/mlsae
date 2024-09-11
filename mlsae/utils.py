@@ -5,7 +5,11 @@ import torch
 
 
 def get_repo_id(
-    model_name: str, expansion_factor: int, k: int, transformer: bool = False
+    model_name: str,
+    expansion_factor: int,
+    k: int,
+    transformer: bool = False,
+    lens: bool = False,
 ) -> str:
     """
     Get the repo_id that corresponds to the specified hyperparameters.
@@ -15,6 +19,8 @@ def get_repo_id(
     repo_id = f"tim-lawson/mlsae-{model_name}-x{expansion_factor}-k{k}"
     if transformer:
         repo_id += "-tfm"
+    if lens:
+        repo_id += "-lens"
     return repo_id
 
 

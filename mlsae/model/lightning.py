@@ -65,6 +65,9 @@ class MLSAEConfig(Serializable):
     skip_special_tokens: bool = True
     """Whether to ignore special tokens."""
 
+    lens: bool = False
+    """Whether to learn a layer-specific transform before/after the encoder/decoder."""
+
 
 class MLSAETransformer(
     LightningModule,
@@ -96,9 +99,8 @@ class MLSAETransformer(
         max_length: int = 2048,
         batch_size: int = 1,
         accumulate_grad_batches: int = 64,
+        lens: bool = False,
         # NOTE: These are only used for loading pretrained models
-        transformer: Transformer | None = None,
-        autoencoder: MLSAE | None = None,
         dead_steps_threshold: int | None = None,
     ) -> None:
         """
@@ -164,6 +166,7 @@ class MLSAETransformer(
         self.max_length = max_length
         self.batch_size = batch_size
         self.accumulate_grad_batches = accumulate_grad_batches
+        self.lens = lens
 
         # Set the number of steps after which a latent is flagged as dead from the
         # number of tokens per batch and the number of batches per step.
@@ -173,7 +176,7 @@ class MLSAETransformer(
             // (self.batch_size * self.max_length * self.accumulate_grad_batches)
         )
 
-        self.transformer = transformer or Transformer(
+        self.transformer = Transformer(
             self.model_name,
             self.max_length,
             self.batch_size,
@@ -190,7 +193,8 @@ class MLSAETransformer(
 
         self.save_hyperparameters(ignore=["autoencoder", "transformer"])
 
-        self.autoencoder: MLSAE = autoencoder or MLSAE(
+        self.autoencoder: MLSAE = MLSAE(
+            self.layers,
             self.n_inputs,
             self.n_latents,
             self.k,
@@ -198,6 +202,7 @@ class MLSAETransformer(
             self.dead_threshold,
             self.auxk,
             self.standardize,
+            self.lens,
         )  # type: ignore
 
         self.mse_loss = MSELoss(self.n_layers)

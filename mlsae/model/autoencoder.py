@@ -6,7 +6,7 @@ import einops
 import torch
 from huggingface_hub import PyTorchModelHubMixin
 from jaxtyping import Float
-from torch.nn import Linear, Module, Parameter
+from torch.nn import Linear, Module, ModuleList, Parameter
 
 from mlsae.model.decoder import decode
 from mlsae.model.types import Stats, TopK
@@ -69,6 +69,7 @@ class MLSAE(
 
     def __init__(
         self,
+        layers: list[int],
         n_inputs: int,
         n_latents: int,
         k: int,
@@ -77,9 +78,12 @@ class MLSAE(
         # TODO: Make this optional and default to a power of 2 close to d_model / 2.
         auxk: int | None = 256,
         standardize: bool = True,
+        lens: bool = False,
     ) -> None:
         """
         Args:
+            layers (list[int] | None): The layers to train on.
+
             n_inputs (int): The number of inputs.
 
             n_latents(int): The number of latents.
@@ -96,6 +100,9 @@ class MLSAE(
                 reconstruction error. Defaults to 256.
 
             standardize (bool): Whether to standardize the inputs. Defaults to True.
+
+            lens (bool): Whether to learn a layer-specific transform before/after the
+                encoder/decoder. Defaults to False.
         """
 
         super().__init__()
@@ -107,6 +114,8 @@ class MLSAE(
         self.dead_steps_threshold = dead_steps_threshold
         self.dead_threshold = dead_threshold
         self.standardize = standardize
+        self.lens = lens
+        self.layers = layers
 
         self.encoder = Linear(n_inputs, n_latents, bias=False)
         self.decoder = Linear(n_latents, n_inputs, bias=False)
@@ -118,12 +127,25 @@ class MLSAE(
         self.decoder.weight.data = self.decoder.weight.data.T.contiguous().T
         unit_norm_decoder(self.decoder)
 
+        if self.lens:
+            self.encoder_lens = ModuleList(
+                [Linear(n_inputs, n_inputs, bias=False) for _ in self.layers]
+            )
+            self.decoder_lens = ModuleList(
+                [Linear(n_inputs, n_inputs, bias=False) for _ in self.layers]
+            )
+
     def encode(
         self, inputs: Float[torch.Tensor, "layer batch pos n_inputs"]
     ) -> EncoderOutput:
         stats = None
         if self.standardize:
             inputs, stats = standardize(inputs)
+
+        if self.lens:
+            # Apply layer-specific transforms before the encoder
+            for i, _layer in enumerate(self.layers):
+                inputs[i, ...] = self.encoder_lens[i](inputs[i, ...])
 
         # Keep a reference to the latents before the TopK activation function
         latents = self.encoder.forward(inputs - self.pre_encoder_bias)
@@ -159,8 +181,15 @@ class MLSAE(
         self, topk: TopK, stats: Stats | None = None
     ) -> Float[torch.Tensor, "layer batch pos n_inputs"]:
         recons = decode(topk, self.decoder.weight) + self.pre_encoder_bias
+
+        if self.lens:
+            # Apply layer-specific transforms after the decoder
+            for i, _layer in enumerate(self.layers):
+                recons[i, ...] = self.decoder_lens[i](recons[i, ...])
+
         if stats is not None:
             recons = recons * stats.std + stats.mean
+
         return recons
 
     def forward(

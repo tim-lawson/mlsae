@@ -29,6 +29,7 @@ def train(config: RunConfig) -> None:
         config.data.max_length,
         config.data.batch_size,
         config.trainer.accumulate_grad_batches,
+        config.autoencoder.lens,
     )  # type: ignore
 
     wandb.login()

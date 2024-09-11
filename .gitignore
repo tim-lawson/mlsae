@@ -6,6 +6,7 @@
 
 lightning_logs
 wandb_logs
+models/tim-lawson
 out
 
 *.ckpt
