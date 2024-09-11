@@ -69,7 +69,11 @@ class Analyser:
 
         self.default_params = default_params or DefaultParams()
 
-        self.examples = Examples(repo_id)
+        self.examples = None
+        try:
+            self.examples = Examples(repo_id)
+        except Exception as exception:
+            logger.warning(f"no examples found: {exception}")
 
     def params(self) -> dict:
         return self.model.hparams_initial
@@ -113,6 +117,8 @@ class Analyser:
     def latent_examples(self, layer: int, latent: int) -> list[Example]:
         """Find the maximally activating examples for the specified latent and layer."""
 
+        if self.examples is None:
+            return []
         return [
             Example(
                 latent=example.latent,
