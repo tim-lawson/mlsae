@@ -126,7 +126,7 @@ class Dists:
     ):
         device = str(device) if isinstance(device, torch.device) else device
         if tensors is not None:
-            self.tensors = tensors
+            self.tensors = {k: v.to(device) for k, v in tensors.items()}
         elif filename is not None:
             self.tensors = load_file(filename, device)
         else:
