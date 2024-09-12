@@ -25,6 +25,7 @@ triton = { version = "^3.0.0", optional = true }
 uvicorn = { extras = ["standard"], version = "^0.30.3" }
 wandb = "^0.17.4"
 zstandard = "^0.23.0"
+tuned-lens = "^0.2.0"
 
 [tool.poetry.extras]
 triton = ["triton"]
