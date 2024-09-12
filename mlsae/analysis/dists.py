@@ -12,7 +12,7 @@ from safetensors.torch import load_file, save_file
 from simple_parsing import Serializable, field, parse
 from tqdm import tqdm
 
-from mlsae.model import DataConfig, DataModule, MLSAETransformer, TopK
+from mlsae.model import DataConfig, MLSAETransformer, TopK, get_train_dataloader
 from mlsae.trainer import initialize
 from mlsae.utils import get_device
 
@@ -78,14 +78,19 @@ def get_tensors(
 ) -> dict[str, torch.Tensor]:
     model = MLSAETransformer.from_pretrained(config.repo_id).to(device)
 
-    data = DataModule(model_name=model.model_name, config=config.data)
-    data.setup()
+    dataloader = get_train_dataloader(
+        config.data.path,
+        model.model_name,
+        config.data.max_length,
+        config.data.batch_size,
+    )
+
     tokens_per_step = config.data.batch_size * config.data.max_length
 
     metric = Metric(model.n_layers, model.n_latents, device)
     rows: list[dict[str, str | int | float]] = []
 
-    for i, batch in enumerate(tqdm(data.dataloader(), total=config.data.max_steps)):
+    for i, batch in enumerate(tqdm(dataloader, total=config.data.max_steps)):
         inputs = model.transformer.forward(batch["input_ids"].to(device))
         topk = model.autoencoder.encode(inputs).topk
         metric.update(topk)
