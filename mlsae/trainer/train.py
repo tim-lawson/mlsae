@@ -14,6 +14,7 @@ def train(config: RunConfig) -> None:
     initialize(config.seed)
 
     data = DataModule(config.model_name, config=config.data)
+
     model: MLSAETransformer = MLSAETransformer(
         config.model_name,
         config.layers,
@@ -50,6 +51,7 @@ def train(config: RunConfig) -> None:
         deterministic=True,
         default_root_dir=config.trainer.default_root_dir,
     )
+
     trainer.fit(model, datamodule=data, ckpt_path=config.trainer.checkpoint_path)
 
     wandb.finish()

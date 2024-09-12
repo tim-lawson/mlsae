@@ -1,8 +1,9 @@
 import math
 from dataclasses import dataclass
 from multiprocessing import cpu_count
+from typing import Literal
 
-from datasets import IterableDataset, load_dataset
+from datasets import Dataset, IterableDataset, load_dataset
 from datasets.formatting.formatting import LazyBatch
 from jaxtyping import Int
 from lightning.pytorch import LightningDataModule
@@ -62,16 +63,18 @@ class DataModule(LightningDataModule):
         # Constrain the maximum length of a tokenized input sequence
         self.max_length = min(self.tokenizer.model_max_length, self.config.max_length)
 
-    def setup(self, stage: str = "fit") -> None:
-        dataset: IterableDataset = load_dataset(
+    def _dataset(
+        self, split: Literal["train", "validation", "test"]
+    ) -> IterableDataset | Dataset:
+        dataset: IterableDataset | Dataset = load_dataset(
             self.config.path,
             name=self.config.name,
-            # TODO: Support different splits
-            split="train",
-            streaming=True,
+            split=split,
+            # TODO: This is specific to monology/pile-uncopyrighted
+            streaming=split == "train",
         )  # type: ignore
 
-        self.dataset = dataset.map(
+        return dataset.map(
             concat_and_tokenize,
             batched=True,
             # Large batch size minimizes the number of tokens dropped
@@ -82,10 +85,10 @@ class DataModule(LightningDataModule):
         ).with_format("torch")
 
     def _dataloader(
-        self, num_workers: int | None = None
+        self, dataset: IterableDataset | Dataset, num_workers: int | None = None
     ) -> DataLoader[Int[Tensor, "batch pos"]]:
         return DataLoader(
-            self.dataset,  # type: ignore
+            dataset,  # type: ignore
             batch_size=self.config.batch_size,
             num_workers=num_workers or self.num_workers,
         )
@@ -93,17 +96,17 @@ class DataModule(LightningDataModule):
     def train_dataloader(
         self, num_workers: int | None = None
     ) -> DataLoader[Int[Tensor, "batch pos"]]:
-        return self._dataloader(num_workers=num_workers)
+        return self._dataloader(self._dataset("train"), num_workers)
 
     def val_dataloader(
         self, num_workers: int | None = None
     ) -> DataLoader[Int[Tensor, "batch pos"]]:
-        return self._dataloader(num_workers=num_workers)
+        return self._dataloader(self._dataset("train"), num_workers)
 
     def test_dataloader(
         self, num_workers: int | None = None
     ) -> DataLoader[Int[Tensor, "batch pos"]]:
-        return self._dataloader(num_workers=num_workers)
+        return self._dataloader(self._dataset("test"), num_workers)
 
 
 # Based on https://github.com/EleutherAI/sae/blob/19d95a401e9d17dbf7d6fb0fa7a91081f1b0d01f/sae/data.py
