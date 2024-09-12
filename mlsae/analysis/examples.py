@@ -270,7 +270,7 @@ def save_examples(config: Config, device: torch.device | str = "cpu") -> None:
 
     conn, cursor = create_db(Examples.filename(config.repo_id))
     batch: dict[str, torch.Tensor]
-    for i, batch in tqdm(enumerate(data._dataloader()), total=config.data.max_steps):
+    for i, batch in tqdm(enumerate(data.dataloader()), total=config.data.max_steps):
         examples = list(get_examples(model, batch, config.n_tokens, device=device))
         insert_examples(cursor, examples)
         if i > config.data.max_steps:

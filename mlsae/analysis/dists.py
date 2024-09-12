@@ -85,7 +85,7 @@ def get_tensors(
     metric = Metric(model.n_layers, model.n_latents, device)
     rows: list[dict[str, str | int | float]] = []
 
-    for i, batch in enumerate(tqdm(data._dataloader(), total=config.data.max_steps)):
+    for i, batch in enumerate(tqdm(data.dataloader(), total=config.data.max_steps)):
         inputs = model.transformer.forward(batch["input_ids"].to(device))
         topk = model.autoencoder.encode(inputs).topk
         metric.update(topk)

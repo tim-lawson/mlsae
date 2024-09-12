@@ -59,11 +59,15 @@ python train.py --model_name EleutherAI/pythia-70m-deduped --expansion_factor 64
 
 ## Analysis
 
-Test multiple pretrained MLSAEs:
+Test a single pretrained MLSAE:
+
+> [!WARNING]
+> We assume that the test split of `monology/pile-uncopyrighted` is already downloaded
+> and stored in `data/test.jsonl.zst`.
 
 ```bash
 python test.py --help
-python test.py --model_name EleutherAI/pythia-70m-deduped --expansion_factor 32 64 128 -k 16 32 64
+python test.py --model_name EleutherAI/pythia-70m-deduped --expansion_factor 64 -k 32
 ```
 
 Compute the distributions of latent activations over layers for a single

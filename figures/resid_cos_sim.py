@@ -48,7 +48,7 @@ def get_resid_cos_sim(
     data.setup()
     metrics = [VarianceMetric() for _ in range(transformer.n_layers - 1)]
 
-    for i, batch in tqdm(enumerate(data._dataloader()), total=config.data.max_steps):
+    for i, batch in tqdm(enumerate(data.dataloader()), total=config.data.max_steps):
         x = transformer.forward(batch["input_ids"].to(device))
         x = normalize(einops.rearrange(x, "l b p i -> l (b p) i"), -1)
         for layer in range(transformer.n_layers - 1):

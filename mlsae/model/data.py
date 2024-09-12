@@ -64,53 +64,46 @@ class DataModule(LightningDataModule):
         self.max_length = min(self.tokenizer.model_max_length, self.config.max_length)
 
     def _dataset(
-        self, split: Literal["train", "validation", "test"]
+        self, split: Literal["train", "validation", "test"] = "train"
     ) -> IterableDataset | Dataset:
         dataset: IterableDataset | Dataset = load_dataset(
             self.config.path,
             name=self.config.name,
             split=split,
-            # TODO: This is specific to monology/pile-uncopyrighted
-            streaming=split == "train",
+            streaming=True,
         )  # type: ignore
 
-        return dataset.map(
-            concat_and_tokenize,
-            batched=True,
-            # Large batch size minimizes the number of tokens dropped
-            batch_size=1024,
-            # TODO: Column names are not always available
-            remove_columns=dataset.column_names or ["text", "meta"],
-            fn_kwargs={"tokenizer": self.tokenizer, "max_length": self.max_length},
-        ).with_format("torch")
-
-    def _dataloader(
-        self, dataset: IterableDataset | Dataset, num_workers: int | None = None
-    ) -> DataLoader[Int[Tensor, "batch pos"]]:
-        return DataLoader(
-            dataset,  # type: ignore
-            batch_size=self.config.batch_size,
-            num_workers=num_workers or self.num_workers,
-        )
+        return concat_and_tokenize(dataset, self.tokenizer, self.max_length)
 
     def train_dataloader(
         self, num_workers: int | None = None
     ) -> DataLoader[Int[Tensor, "batch pos"]]:
-        return self._dataloader(self._dataset("train"), num_workers)
+        return get_dataloader(self._dataset(), self.config.batch_size, self.num_workers)
 
     def val_dataloader(
         self, num_workers: int | None = None
     ) -> DataLoader[Int[Tensor, "batch pos"]]:
-        return self._dataloader(self._dataset("train"), num_workers)
+        return get_dataloader(self._dataset(), self.config.batch_size, self.num_workers)
 
-    def test_dataloader(
-        self, num_workers: int | None = None
-    ) -> DataLoader[Int[Tensor, "batch pos"]]:
-        return self._dataloader(self._dataset("test"), num_workers)
+
+def concat_and_tokenize(
+    dataset: IterableDataset | Dataset,
+    tokenizer: PreTrainedTokenizerBase,
+    max_length: int,
+) -> IterableDataset | Dataset:
+    return dataset.map(
+        _concat_and_tokenize,
+        batched=True,
+        # Large batch size minimizes the number of tokens dropped
+        batch_size=1024,
+        # TODO: Column names are not always available
+        remove_columns=dataset.column_names or ["text", "meta"],
+        fn_kwargs={"tokenizer": tokenizer, "max_length": max_length},
+    ).with_format("torch")
 
 
 # Based on https://github.com/EleutherAI/sae/blob/19d95a401e9d17dbf7d6fb0fa7a91081f1b0d01f/sae/data.py
-def concat_and_tokenize(
+def _concat_and_tokenize(
     batch: LazyBatch, tokenizer: PreTrainedTokenizerBase, max_length: int
 ) -> dict:
     output = tokenizer(
@@ -134,3 +127,9 @@ def concat_and_tokenize(
 
     # Drop the last batch, which is probably incomplete
     return {k: v[:-1] for k, v in output.items()}
+
+
+def get_dataloader(
+    dataset: IterableDataset | Dataset, batch_size: int, num_workers: int
+) -> DataLoader[Int[Tensor, "batch pos"]]:
+    return DataLoader(dataset, batch_size=batch_size, num_workers=num_workers)  # type: ignore

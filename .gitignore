@@ -6,6 +6,8 @@
 
 lightning_logs
 wandb_logs
+data
+models
 out
 
 *.ckpt
