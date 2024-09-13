@@ -114,8 +114,9 @@ def get_tensors(
             break
 
     if len(rows) > 0:
+        repo_id = config.repo_id.split("/")[-1]
         pd.DataFrame(rows).to_csv(
-            os.path.join("out", "dists_layer_std_step.csv"), index=False
+            os.path.join("out", f"dists_layer_std_step_{repo_id}.csv"), index=False
         )
 
     return metric.compute()
