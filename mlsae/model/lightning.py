@@ -228,6 +228,7 @@ class MLSAETransformer(
             self.lens = TunedLens.from_model_and_pretrained(
                 self.transformer.model,
                 self.transformer.model_name,
+                map_location=self.device,
             )
             self.lens.eval()
             self.lens.requires_grad_(False)
