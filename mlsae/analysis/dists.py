@@ -46,7 +46,6 @@ class Metric:
         self.n_latents = n_latents
         self.counts = torch.zeros((n_layers, n_latents), device=device)
         self.totals = torch.zeros((n_layers, n_latents), device=device)
-        self.layers = torch.arange(n_layers, device=device).unsqueeze(1)
         self.device = device
 
     def update(self, x: TopK) -> None:
