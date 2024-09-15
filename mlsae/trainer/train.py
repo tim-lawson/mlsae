@@ -6,14 +6,30 @@ from lightning.fabric.plugins.precision.precision import _PRECISION_INPUT
 from lightning.pytorch import Trainer
 from lightning.pytorch.loggers import WandbLogger
 
-from mlsae.model import DataModule, MLSAETransformer
+from mlsae.model import MLSAETransformer
+from mlsae.model.data import get_train_dataloader
 from mlsae.trainer.config import RunConfig, initialize
 
 
 def train(config: RunConfig) -> None:
     initialize(config.seed)
 
-    data = DataModule(config.model_name, config=config.data)
+    train_dataloader = get_train_dataloader(
+        config.data.path,
+        config.model_name,
+        config.data.max_length,
+        config.data.batch_size,
+        config.data.num_workers or 1,
+    )
+
+    val_dataloader = get_train_dataloader(
+        config.data.path,
+        config.model_name,
+        config.data.max_length,
+        config.data.batch_size,
+        config.data.num_workers or 1,
+    )
+
     model: MLSAETransformer = MLSAETransformer(
         config.model_name,
         config.layers,
@@ -31,7 +47,7 @@ def train(config: RunConfig) -> None:
         config.trainer.accumulate_grad_batches,
     )  # type: ignore
 
-    wandb.login()
+    wandb.login()  # type: ignore
 
     trainer = Trainer(
         precision=cast(_PRECISION_INPUT, config.trainer.precision),
@@ -50,6 +66,12 @@ def train(config: RunConfig) -> None:
         deterministic=True,
         default_root_dir=config.trainer.default_root_dir,
     )
-    trainer.fit(model, datamodule=data, ckpt_path=config.trainer.checkpoint_path)
 
-    wandb.finish()
+    trainer.fit(
+        model,
+        train_dataloaders=train_dataloader,
+        val_dataloaders=val_dataloader,
+        ckpt_path=config.trainer.checkpoint_path,
+    )
+
+    wandb.finish()  # type: ignore

@@ -1,11 +1,10 @@
 import math
 from dataclasses import dataclass
-from multiprocessing import cpu_count
 
+import torch
 from datasets import IterableDataset, load_dataset
 from datasets.formatting.formatting import LazyBatch
 from jaxtyping import Int
-from lightning.pytorch import LightningDataModule
 from simple_parsing import Serializable
 from torch import Tensor
 from torch.utils.data import DataLoader
@@ -18,10 +17,6 @@ class DataConfig(Serializable):
 
     path: str = "monology/pile-uncopyrighted"
     """The path to a HuggingFace text dataset."""
-
-    # TODO: Support different splits
-    name: str | None = None
-    """The subset of the dataset to train on."""
 
     max_length: int = 2048
     """The maximum length of a tokenized input sequence."""
@@ -42,72 +37,24 @@ class DataConfig(Serializable):
         return math.ceil(self.max_tokens / (self.batch_size * self.max_length))
 
 
-class DataModule(LightningDataModule):
-    def __init__(self, model_name: str, config: DataConfig) -> None:
-        """
-        Args:
-            model_name (str): The name of a pretrained GPTNeoXForCausalLM model.
-
-            config (DataConfig): The data configuration.
-        """
-
-        super().__init__()
-
-        self.model_name = model_name
-        self.config = config
-        self.num_workers = config.num_workers or cpu_count() // 2
-
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-
-        # Constrain the maximum length of a tokenized input sequence
-        self.max_length = min(self.tokenizer.model_max_length, self.config.max_length)
-
-    def setup(self, stage: str = "fit") -> None:
-        dataset: IterableDataset = load_dataset(
-            self.config.path,
-            name=self.config.name,
-            # TODO: Support different splits
-            split="train",
-            streaming=True,
-        )  # type: ignore
-
-        self.dataset = dataset.map(
-            concat_and_tokenize,
-            batched=True,
-            # Large batch size minimizes the number of tokens dropped
-            batch_size=1024,
-            # TODO: Column names are not always available
-            remove_columns=dataset.column_names or ["text", "meta"],
-            fn_kwargs={"tokenizer": self.tokenizer, "max_length": self.max_length},
-        ).with_format("torch")
-
-    def _dataloader(
-        self, num_workers: int | None = None
-    ) -> DataLoader[Int[Tensor, "batch pos"]]:
-        return DataLoader(
-            self.dataset,  # type: ignore
-            batch_size=self.config.batch_size,
-            num_workers=num_workers or self.num_workers,
-        )
-
-    def train_dataloader(
-        self, num_workers: int | None = None
-    ) -> DataLoader[Int[Tensor, "batch pos"]]:
-        return self._dataloader(num_workers=num_workers)
-
-    def val_dataloader(
-        self, num_workers: int | None = None
-    ) -> DataLoader[Int[Tensor, "batch pos"]]:
-        return self._dataloader(num_workers=num_workers)
-
-    def test_dataloader(
-        self, num_workers: int | None = None
-    ) -> DataLoader[Int[Tensor, "batch pos"]]:
-        return self._dataloader(num_workers=num_workers)
+def concat_and_tokenize(
+    dataset: IterableDataset,
+    tokenizer: PreTrainedTokenizerBase,
+    max_length: int,
+) -> IterableDataset:
+    return dataset.map(
+        _concat_and_tokenize,
+        batched=True,
+        # Large batch size minimizes the number of tokens dropped
+        batch_size=1024,
+        # TODO: Column names are not always available
+        remove_columns=dataset.column_names or ["text", "meta"],
+        fn_kwargs={"tokenizer": tokenizer, "max_length": max_length},
+    ).with_format("torch")
 
 
 # Based on https://github.com/EleutherAI/sae/blob/19d95a401e9d17dbf7d6fb0fa7a91081f1b0d01f/sae/data.py
-def concat_and_tokenize(
+def _concat_and_tokenize(
     batch: LazyBatch, tokenizer: PreTrainedTokenizerBase, max_length: int
 ) -> dict:
     output = tokenizer(
@@ -131,3 +78,51 @@ def concat_and_tokenize(
 
     # Drop the last batch, which is probably incomplete
     return {k: v[:-1] for k, v in output.items()}
+
+
+def get_dataloader(
+    dataset: IterableDataset,
+    model_name: str,
+    max_length: int,
+    batch_size: int,
+    num_workers: int = 1,
+) -> DataLoader[Int[Tensor, "batch pos"]]:
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+    # Constrain the maximum length of a tokenized input sequence
+    max_length = min(tokenizer.model_max_length, max_length)
+
+    return DataLoader(
+        concat_and_tokenize(dataset, tokenizer, max_length),  # type: ignore
+        batch_size=batch_size,
+        num_workers=num_workers,
+    )
+
+
+def get_train_dataloader(
+    path: str, model_name: str, max_length: int, batch_size: int, num_workers: int = 1
+) -> DataLoader[torch.Tensor]:
+    return get_dataloader(
+        load_dataset(path, split="train", streaming=True),  # type: ignore
+        model_name,
+        max_length,
+        batch_size,
+        num_workers,
+    )
+
+
+def get_test_dataloader(
+    model_name: str, max_length: int, batch_size: int, num_workers: int = 1
+) -> DataLoader[torch.Tensor]:
+    return get_dataloader(
+        load_dataset(
+            "json",
+            data_files="./data/test.jsonl.zst",
+            split="train",
+            streaming=True,
+        ),  # type: ignore
+        model_name,
+        max_length,
+        batch_size,
+        num_workers,
+    )

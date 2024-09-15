@@ -14,7 +14,8 @@ from loguru import logger
 from simple_parsing import Serializable, field, parse
 from tqdm import tqdm
 
-from mlsae.model import DataConfig, DataModule, MLSAETransformer
+from mlsae.model import DataConfig, MLSAETransformer
+from mlsae.model.data import get_train_dataloader
 from mlsae.trainer import initialize
 from mlsae.utils import get_device
 
@@ -265,12 +266,17 @@ def select_examples(cursor: sqlite3.Cursor, latent: int, layer: int) -> list[Exa
 @torch.no_grad()
 def save_examples(config: Config, device: torch.device | str = "cpu") -> None:
     model = MLSAETransformer.from_pretrained(config.repo_id).to(device)
-    data = DataModule(model_name=model.model_name, config=config.data)
-    data.setup()
+
+    dataloader = get_train_dataloader(
+        config.data.path,
+        model.model_name,
+        config.data.max_length,
+        config.data.batch_size,
+    )
 
     conn, cursor = create_db(Examples.filename(config.repo_id))
     batch: dict[str, torch.Tensor]
-    for i, batch in tqdm(enumerate(data._dataloader()), total=config.data.max_steps):
+    for i, batch in tqdm(enumerate(dataloader), total=config.data.max_steps):
         examples = list(get_examples(model, batch, config.n_tokens, device=device))
         insert_examples(cursor, examples)
         if i > config.data.max_steps:

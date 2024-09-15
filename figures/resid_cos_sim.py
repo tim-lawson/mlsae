@@ -7,7 +7,8 @@ import torch
 from simple_parsing import parse
 from tqdm import tqdm
 
-from mlsae.model import DataModule, Transformer
+from mlsae.model import Transformer
+from mlsae.model.data import get_train_dataloader
 from mlsae.trainer import RunConfig, initialize
 from mlsae.utils import get_device, normalize
 
@@ -44,11 +45,17 @@ def get_resid_cos_sim(
         device=device,
     )
     transformer.model.to(device)  # type: ignore
-    data = DataModule(model_name=config.model_name, config=config.data)
-    data.setup()
+
+    dataloader = get_train_dataloader(
+        config.data.path,
+        config.model_name,
+        config.data.max_length,
+        config.data.batch_size,
+    )
+
     metrics = [VarianceMetric() for _ in range(transformer.n_layers - 1)]
 
-    for i, batch in tqdm(enumerate(data._dataloader()), total=config.data.max_steps):
+    for i, batch in tqdm(enumerate(dataloader), total=config.data.max_steps):
         x = transformer.forward(batch["input_ids"].to(device))
         x = normalize(einops.rearrange(x, "l b p i -> l (b p) i"), -1)
         for layer in range(transformer.n_layers - 1):
