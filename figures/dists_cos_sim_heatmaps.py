@@ -1,4 +1,5 @@
 import os
+from dataclasses import dataclass
 
 import torch
 from matplotlib import pyplot as plt
@@ -9,6 +10,12 @@ from mlsae.analysis.dists import Dists
 from mlsae.model import MLSAE
 from mlsae.trainer.config import SweepConfig
 from mlsae.utils import get_device, normalize
+
+
+@dataclass
+class Config(SweepConfig):
+    tuned_lens: bool = False
+    """Whether to apply a pretrained tuned lens before the encoder."""
 
 
 @torch.no_grad()
@@ -56,7 +63,7 @@ def save_heatmap(
 
 if __name__ == "__main__":
     device = get_device()
-    config = parse(SweepConfig)
+    config = parse(Config)
     for repo_id in config.repo_ids(transformer=False):
         filename = f"dists_cos_sim_heatmap_{repo_id.split('/')[-1]}.pdf"
         x, y = get_dists_cos_sim(repo_id, device)
