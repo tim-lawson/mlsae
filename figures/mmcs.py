@@ -1,4 +1,5 @@
 import os
+from dataclasses import dataclass
 
 import pandas as pd
 import torch
@@ -10,16 +11,23 @@ from mlsae.trainer import SweepConfig, initialize
 from mlsae.utils import get_device, get_repo_id, normalize
 
 
+@dataclass
+class Config(SweepConfig):
+    tuned_lens: bool = False
+    """Whether to apply a pretrained tuned lens before the encoder."""
+
+
 @torch.no_grad()
 def get_max_cos_sim(
     model_name: str,
     expansion_factor: int,
     k: int,
+    tuned_lens: bool,
     max_latents: int = 16384,
     chunk_size: int = 1024,
     device: torch.device | str = "cpu",
 ) -> tuple[torch.Tensor, int]:
-    repo_id = get_repo_id(model_name, expansion_factor, k, False)
+    repo_id = get_repo_id(model_name, expansion_factor, k, False, tuned_lens)
     mlsae = MLSAE.from_pretrained(repo_id).to(device)
     W_dec = normalize(mlsae.decoder.weight.detach())
 
@@ -48,13 +56,13 @@ def get_max_cos_sim(
 
 if __name__ == "__main__":
     device = get_device()
-    config = parse(SweepConfig)
+    config = parse(Config)
     initialize(config.seed)
 
     rows: list[dict[str, str | int | float]] = []
     for model_name, expansion_factor, k in config:
         max_cos_sim, n_latents = get_max_cos_sim(
-            model_name, expansion_factor, k, device=device
+            model_name, expansion_factor, k, config.tuned_lens, device=device
         )
         rows.append(
             {

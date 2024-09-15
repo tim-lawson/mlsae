@@ -24,6 +24,9 @@ class Config(SweepConfig):
     seed: int = 42
     """The seed for global random state."""
 
+    tuned_lens: bool = False
+    """Whether to apply a pretrained tuned lens before the encoder."""
+
 
 @torch.no_grad()
 def get_embed_cos_sim(
@@ -72,7 +75,7 @@ if __name__ == "__main__":
 
     rows: list[dict[str, str | int | float]] = []
     for model_name, expansion_factor, k in config:
-        repo_id = get_repo_id(model_name, expansion_factor, k, transformer=False)
+        repo_id = get_repo_id(model_name, expansion_factor, k, False, config.tuned_lens)
         topk_in, topk_out = get_embed_cos_sim(config, repo_id, model_name)
         n_latents = topk_in.shape[0]
         rows.append(

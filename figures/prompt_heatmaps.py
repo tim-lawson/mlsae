@@ -19,6 +19,9 @@ class Config(SweepConfig):
     dead_threshold: float = 1e-3
     """The threshold activation to exclude latents."""
 
+    tuned_lens: bool = False
+    """Whether to apply a pretrained tuned lens before the encoder."""
+
 
 @torch.no_grad()
 def get_data(config: Config, repo_id: str, device: torch.device | str) -> torch.Tensor:
@@ -43,7 +46,7 @@ def get_data(config: Config, repo_id: str, device: torch.device | str) -> torch.
 if __name__ == "__main__":
     device = get_device()
     config = parse(Config)
-    for repo_id in config.repo_ids():
+    for repo_id in config.repo_ids(tuned_lens=True):
         filename = f"prompt_heatmap_{repo_id.split('/')[-1]}.pdf"
         data = get_data(config, repo_id, device)
-        save_heatmap(data.cpu(), os.path.join("out", filename))
+        save_heatmap(data.cpu(), os.path.join("out", filename), figsize=(5.5, 1.75))
