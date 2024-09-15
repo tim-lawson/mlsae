@@ -33,6 +33,9 @@ def get_data(config: Config, repo_id: str, device: torch.device | str) -> torch.
     # Exclude latents with maximum activation below the threshold
     latents = latents[:, latents.max(dim=0).values.gt(config.dead_threshold)]
 
+    # Convert latents to 'probabilities'
+    latents = latents / latents.sum(dim=0, keepdim=True)
+
     # Sort latents in ascending order of mean layer
     layers = torch.arange(0, model.n_layers, device=device).unsqueeze(-1)
     _, indices = ((latents / latents.sum(0)) * layers).sum(0).sort(descending=True)
@@ -46,4 +49,4 @@ if __name__ == "__main__":
     for repo_id in config.repo_ids():
         filename = f"prompt_heatmap_{repo_id.split('/')[-1]}.pdf"
         data = get_data(config, repo_id, device)
-        save_heatmap(data.cpu(), os.path.join("out", filename), figsize=(5.5, 1.75))
+        save_heatmap(data.cpu(), os.path.join("out", filename), figsize=(5.5, 1.25))
