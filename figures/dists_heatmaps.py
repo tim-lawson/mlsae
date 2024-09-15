@@ -1,4 +1,5 @@
 import os
+from dataclasses import dataclass
 
 from simple_parsing import parse
 
@@ -6,6 +7,13 @@ from mlsae.analysis.dists import Dists
 from mlsae.analysis.heatmaps import save_heatmap
 from mlsae.trainer import SweepConfig
 from mlsae.utils import get_device
+
+
+@dataclass
+class Config(SweepConfig):
+    tuned_lens: bool = False
+    """Whether to apply a pretrained tuned lens before the encoder."""
+
 
 if __name__ == "__main__":
     device = get_device()
