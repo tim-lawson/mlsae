@@ -28,19 +28,21 @@ def get_data(config: Config, repo_id: str, device: torch.device | str) -> torch.
     tokens = torch.tensor(tokens).unsqueeze(0)
     inputs = model.transformer.forward(tokens.to(device))
     topk = model.autoencoder.forward(inputs).topk
-    latents = scatter_topk(topk, model.n_latents).squeeze()
+
+    # Sum over the tokens in the prompt
+    latents = scatter_topk(topk, model.n_latents).squeeze().sum(dim=1)
 
     # Exclude latents with maximum activation below the threshold
     latents = latents[:, latents.max(dim=0).values.gt(config.dead_threshold)]
 
-    # Convert latents to 'probabilities'
-    latents = latents / latents.sum(dim=0, keepdim=True)
+    # Convert activations to probabilities
+    probs = latents / latents.sum(dim=0, keepdim=True)
 
     # Sort latents in ascending order of mean layer
     layers = torch.arange(0, model.n_layers, device=device).unsqueeze(-1)
-    _, indices = ((latents / latents.sum(0)) * layers).sum(0).sort(descending=True)
+    _, indices = (probs * layers).sum(0).sort(descending=True)
 
-    return latents[:, indices]
+    return probs[:, indices]
 
 
 if __name__ == "__main__":
