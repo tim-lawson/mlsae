@@ -1,5 +1,4 @@
 import os
-from dataclasses import dataclass
 
 import pandas as pd
 import torch
@@ -9,12 +8,6 @@ from tqdm import tqdm
 from mlsae.model import MLSAE
 from mlsae.trainer import SweepConfig, initialize
 from mlsae.utils import get_device, get_repo_id, normalize
-
-
-@dataclass
-class Config(SweepConfig):
-    tuned_lens: bool = False
-    """Whether to apply a pretrained tuned lens before the encoder."""
 
 
 @torch.no_grad()
@@ -56,7 +49,7 @@ def get_max_cos_sim(
 
 if __name__ == "__main__":
     device = get_device()
-    config = parse(Config)
+    config = parse(SweepConfig)
     initialize(config.seed)
 
     rows: list[dict[str, str | int | float]] = []
@@ -70,6 +63,7 @@ if __name__ == "__main__":
                 "n_latents": n_latents,
                 "expansion_factor": expansion_factor,
                 "k": k,
+                "tuned_lens": config.tuned_lens,
                 "mean": max_cos_sim.mean().item(),
                 "var": max_cos_sim.var().item(),
                 "std": max_cos_sim.std().item(),

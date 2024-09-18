@@ -80,17 +80,20 @@ class SweepConfig(Serializable):
     k: list[int] = field(default_factory=list)
     """The numbers of largest latents to keep."""
 
+    tuned_lens: bool = False
+    """Whether to apply a pretrained tuned lens before the encoder."""
+
     seed: int = 42
     """The seed for global random state."""
 
     def __iter__(self) -> Generator[tuple[str, int, int], None, None]:
         yield from product(self.model_name, self.expansion_factor, self.k)
 
-    def repo_ids(
-        self, transformer: bool = True, tuned_lens: bool = False
-    ) -> Generator[str, None, None]:
+    def repo_ids(self, transformer: bool = True) -> Generator[str, None, None]:
         for param in self:
-            yield get_repo_id(*param, transformer=transformer, tuned_lens=tuned_lens)
+            yield get_repo_id(
+                *param, transformer=transformer, tuned_lens=self.tuned_lens
+            )
 
 
 def initialize(seed: int) -> None:

@@ -1,5 +1,4 @@
 import os
-from dataclasses import dataclass
 
 import pandas as pd
 from simple_parsing import parse
@@ -8,16 +7,9 @@ from mlsae.analysis.dists import Dists, get_stats
 from mlsae.trainer import SweepConfig, initialize
 from mlsae.utils import get_device, get_repo_id
 
-
-@dataclass
-class Config(SweepConfig):
-    tuned_lens: bool = False
-    """Whether to apply a pretrained tuned lens before the encoder."""
-
-
 if __name__ == "__main__":
     device = get_device()
-    config = parse(Config)
+    config = parse(SweepConfig)
     initialize(config.seed)
 
     rows: list[dict[str, str | int | float]] = []
@@ -31,6 +23,7 @@ if __name__ == "__main__":
                 "n_latents": dists.n_latents,
                 "expansion_factor": expansion_factor,
                 "k": k,
+                "tuned_lens": config.tuned_lens,
                 **get_stats(dists.layer_std),
             }
         )
