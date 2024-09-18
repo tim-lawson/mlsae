@@ -24,9 +24,6 @@ class Config(SweepConfig):
     seed: int = 42
     """The seed for global random state."""
 
-    tuned_lens: bool = False
-    """Whether to apply a pretrained tuned lens before the encoder."""
-
 
 @torch.no_grad()
 def get_embed_cos_sim(
