@@ -1,5 +1,4 @@
 import os
-from dataclasses import dataclass
 
 import torch
 from matplotlib import pyplot as plt
@@ -10,12 +9,6 @@ from mlsae.analysis.dists import Dists
 from mlsae.model import MLSAE
 from mlsae.trainer.config import SweepConfig
 from mlsae.utils import get_device, normalize
-
-
-@dataclass
-class Config(SweepConfig):
-    tuned_lens: bool = False
-    """Whether to apply a pretrained tuned lens before the encoder."""
 
 
 @torch.no_grad()

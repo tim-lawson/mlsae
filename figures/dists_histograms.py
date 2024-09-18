@@ -16,16 +16,13 @@ class Config(SweepConfig):
     noninteger: bool = False
     """Whether to plot the non-integer component of the center of mass."""
 
-    tuned_lens: bool = False
-    """Whether to apply a pretrained tuned lens before the encoder."""
-
 
 if __name__ == "__main__":
     device = get_device()
     config = parse(Config)
     initialize(config.seed)
 
-    for repo_id in config.repo_ids(tuned_lens=config.tuned_lens):
+    for repo_id in config.repo_ids():
         dists = Dists.load(repo_id, device)
         values = dists.layer_mean[~torch.isnan(dists.layer_mean)].cpu().numpy()
 
