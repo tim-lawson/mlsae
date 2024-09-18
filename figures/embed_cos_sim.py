@@ -72,7 +72,7 @@ if __name__ == "__main__":
 
     rows: list[dict[str, str | int | float]] = []
     for model_name, expansion_factor, k in config:
-        repo_id = get_repo_id(model_name, expansion_factor, k, transformer=False)
+        repo_id = get_repo_id(model_name, expansion_factor, k, False, config.tuned_lens)
         topk_in, topk_out = get_embed_cos_sim(config, repo_id, model_name)
         n_latents = topk_in.shape[0]
         rows.append(
@@ -81,6 +81,7 @@ if __name__ == "__main__":
                 "n_latents": n_latents,
                 "expansion_factor": expansion_factor,
                 "k": k,
+                "tuned_lens": config.tuned_lens,
                 "in_mean": topk_in.mean().item(),
                 "in_var": topk_in.var().item(),
                 "in_std": topk_in.std().item(),

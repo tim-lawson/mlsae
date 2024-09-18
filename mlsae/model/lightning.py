@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from functools import partial
 
+import einops
 import torch
 import wandb
 import wandb.plot
@@ -9,6 +10,7 @@ from jaxtyping import Float, Int
 from lightning.pytorch import LightningModule
 from simple_parsing import Serializable
 from torchmetrics import MetricCollection
+from tuned_lens import TunedLens
 
 from mlsae.metrics import (
     AuxiliaryLoss,
@@ -65,6 +67,27 @@ class MLSAEConfig(Serializable):
     skip_special_tokens: bool = True
     """Whether to ignore special tokens."""
 
+    tuned_lens: bool = False
+    """Whether to apply a pretrained tuned lens before the encoder."""
+
+
+def create_untransform_hidden(tuned_lens: TunedLens):
+    invs = []
+    lens: torch.nn.Linear
+    for lens in tuned_lens.layer_translators:  # type: ignore
+        invs.append(
+            torch.linalg.inv(
+                lens.weight + torch.eye(lens.weight.shape[0], device=lens.weight.device)
+            )
+        )
+
+    def untransform_hidden(h: torch.Tensor, idx: int) -> torch.Tensor:
+        lens: torch.nn.Linear = tuned_lens.layer_translators[idx]  # type: ignore
+        inv: torch.Tensor = invs[idx]
+        return einops.einsum(inv.to(h.device), h - lens.bias, "n n, b p n -> b p n")
+
+    return untransform_hidden
+
 
 class MLSAETransformer(
     LightningModule,
@@ -96,9 +119,8 @@ class MLSAETransformer(
         max_length: int = 2048,
         batch_size: int = 1,
         accumulate_grad_batches: int = 64,
+        tuned_lens: bool = False,
         # NOTE: These are only used for loading pretrained models
-        transformer: Transformer | None = None,
-        autoencoder: MLSAE | None = None,
         dead_steps_threshold: int | None = None,
     ) -> None:
         """
@@ -164,6 +186,7 @@ class MLSAETransformer(
         self.max_length = max_length
         self.batch_size = batch_size
         self.accumulate_grad_batches = accumulate_grad_batches
+        self.tuned_lens = tuned_lens
 
         # Set the number of steps after which a latent is flagged as dead from the
         # number of tokens per batch and the number of batches per step.
@@ -173,7 +196,7 @@ class MLSAETransformer(
             // (self.batch_size * self.max_length * self.accumulate_grad_batches)
         )
 
-        self.transformer = transformer or Transformer(
+        self.transformer = Transformer(
             self.model_name,
             self.max_length,
             self.batch_size,
@@ -182,6 +205,7 @@ class MLSAETransformer(
             device=self.device,
         )
         self.transformer.eval()
+        self.transformer.requires_grad_(False)
 
         self.layers = self.transformer.layers
         self.n_layers = self.transformer.n_layers
@@ -190,7 +214,7 @@ class MLSAETransformer(
 
         self.save_hyperparameters(ignore=["autoencoder", "transformer"])
 
-        self.autoencoder: MLSAE = autoencoder or MLSAE(
+        self.autoencoder: MLSAE = MLSAE(
             self.n_inputs,
             self.n_latents,
             self.k,
@@ -199,6 +223,16 @@ class MLSAETransformer(
             self.auxk,
             self.standardize,
         )  # type: ignore
+
+        if self.tuned_lens:
+            self.lens = TunedLens.from_model_and_pretrained(
+                self.transformer.model,
+                self.transformer.model_name,
+                map_location=self.device,
+            )
+            self.lens.eval()
+            self.lens.requires_grad_(False)
+            self.untransform_hidden = create_untransform_hidden(self.lens)
 
         self.mse_loss = MSELoss(self.n_layers)
         self.aux_loss = AuxiliaryLoss(self.auxk_coef or 0.0)
@@ -245,12 +279,35 @@ class MLSAETransformer(
         self.register_buffer("logits_pred", torch.zeros(logits))
 
     def forward(self, tokens: Int[torch.Tensor, "batch pos"]) -> AutoencoderOutput:
-        return self.autoencoder.forward(self.transformer.forward(tokens))
+        inputs = self.forward_lens(self.transformer.forward(tokens))
+        topk, recons, auxk, auxk_recons, dead = self.autoencoder.forward(inputs)
+        recons = self.inverse_lens(recons)
+        return AutoencoderOutput(topk, recons, auxk, auxk_recons, dead)
+
+    def forward_lens(
+        self, inputs: Float[torch.Tensor, "layer batch pos n_inputs"]
+    ) -> Float[torch.Tensor, "layer batch pos n_latents"]:
+        if not self.tuned_lens:
+            return inputs
+        self.lens.to(inputs.device)
+        for layer in range(self.n_layers):
+            inputs[layer, ...] = self.lens.transform_hidden(inputs[layer, ...], layer)
+        return inputs
+
+    def inverse_lens(
+        self, recons: Float[torch.Tensor, "layer batch pos n_latents"]
+    ) -> Float[torch.Tensor, "layer batch pos n_inputs"]:
+        if not self.tuned_lens:
+            return recons
+        self.lens.to(recons.device)
+        for layer in range(self.n_layers):
+            recons[layer, ...] = self.untransform_hidden(recons[layer, ...], layer)
+        return recons
 
     def training_step(
         self, batch: dict[str, Int[torch.Tensor, "batch pos"]], batch_idx: int
     ) -> Float[torch.Tensor, ""]:
-        inputs = self.transformer.forward(batch["input_ids"])
+        inputs = self.forward_lens(self.transformer.forward(batch["input_ids"]))
 
         if batch_idx == 0:
             self.autoencoder.pre_encoder_bias.data = geometric_median(inputs)
@@ -304,8 +361,9 @@ class MLSAETransformer(
     @torch.no_grad()
     def validation_step(self, batch: dict[str, Int[torch.Tensor, "batch pos"]]) -> None:
         tokens = batch["input_ids"]
-        inputs = self.transformer.forward(tokens)
+        inputs = self.forward_lens(self.transformer.forward(tokens))
         topk, recons, auxk, auxk_recons, dead = self.autoencoder.forward(inputs)
+        recons = self.inverse_lens(recons)
 
         self.forward_at_layer(inputs, recons, tokens)
         val_metrics = self.val_metrics.forward(
@@ -320,8 +378,9 @@ class MLSAETransformer(
     @torch.no_grad()
     def test_step(self, batch: dict[str, Int[torch.Tensor, "batch pos"]]) -> None:
         tokens = batch["input_ids"]
-        inputs = self.transformer.forward(tokens)
+        inputs = self.forward_lens(self.transformer.forward(tokens))
         topk, recons, auxk, auxk_recons, dead = self.autoencoder.forward(inputs)
+        recons = self.inverse_lens(recons)
 
         train_metrics = self.train_metrics.forward(
             inputs=inputs,

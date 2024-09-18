@@ -13,6 +13,7 @@ simple-parsing
 torch
 transformers
 triton
+tuned-lens
 uvicorn
 wandb
 zstandard

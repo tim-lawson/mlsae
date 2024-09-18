@@ -14,7 +14,8 @@ if __name__ == "__main__":
 
     rows: list[dict[str, str | int | float]] = []
     for model_name, expansion_factor, k in config:
-        dists = Dists.load(get_repo_id(model_name, expansion_factor, k, True), device)
+        repo_id = get_repo_id(model_name, expansion_factor, k, True, config.tuned_lens)
+        dists = Dists.load(repo_id, device)
         rows.append(
             {
                 "model_name": model_name,
@@ -22,6 +23,7 @@ if __name__ == "__main__":
                 "n_latents": dists.n_latents,
                 "expansion_factor": expansion_factor,
                 "k": k,
+                "tuned_lens": config.tuned_lens,
                 **get_stats(dists.layer_std),
             }
         )

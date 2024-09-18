@@ -46,4 +46,4 @@ if __name__ == "__main__":
     for repo_id in config.repo_ids():
         filename = f"prompt_heatmap_{repo_id.split('/')[-1]}.pdf"
         data = get_data(config, repo_id, device)
-        save_heatmap(data.cpu(), os.path.join("out", filename))
+        save_heatmap(data.cpu(), os.path.join("out", filename), figsize=(5.5, 1.75))
