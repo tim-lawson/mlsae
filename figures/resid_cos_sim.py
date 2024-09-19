@@ -8,7 +8,7 @@ from simple_parsing import parse
 from tqdm import tqdm
 
 from mlsae.model import Transformer
-from mlsae.model.data import get_train_dataloader
+from mlsae.model.data import get_test_dataloader
 from mlsae.trainer import RunConfig, initialize
 from mlsae.utils import get_device, normalize
 
@@ -35,9 +35,7 @@ class VarianceMetric:
 
 
 @torch.no_grad()
-def get_resid_cos_sim(
-    config: RunConfig, device: torch.device | str = "cpu"
-) -> list[dict[str, float]]:
+def save_resid_cos_sim(config: RunConfig, device: torch.device | str = "cpu") -> None:
     transformer = Transformer(
         config.model_name,
         config.data.max_length,
@@ -48,18 +46,22 @@ def get_resid_cos_sim(
     )
     transformer.model.to(device)  # type: ignore
 
-    dataloader = get_train_dataloader(
-        config.data.path,
+    dataloader = get_test_dataloader(
         config.model_name,
         config.data.max_length,
         config.data.batch_size,
     )
 
-    resid_mean = [
+    model_name = config.model_name.split("/")[-1]
+
+    means = [
         VarianceMetric(size=(transformer.config.hidden_size,), device=device)
         for _ in range(transformer.n_layers)
     ]
-    resid_cos_sim = [
+    l2_norms = [
+        VarianceMetric(size=(1,), device=device) for _ in range(transformer.n_layers)
+    ]
+    cos_sims = [
         VarianceMetric(size=(1,), device=device)
         for _ in range(transformer.n_layers - 1)
     ]
@@ -69,42 +71,44 @@ def get_resid_cos_sim(
     for i, batch in tqdm(enumerate(dataloader), total=config.data.max_steps):
         x = transformer.forward(batch["input_ids"].to(device))
         x = einops.rearrange(x, "l b p i -> l (b p) i")
-        for layer in range(transformer.n_layers - 1):
-            resid_mean[layer].update(x[layer, ...])
+        for layer in range(transformer.n_layers):
+            means[layer].update(x[layer, ...])
+            l2_norms[layer].update(x[layer, ...].norm(dim=-1))
         if i > config.data.max_steps:
             break
 
-    resid_mean = [metric.compute() for metric in resid_mean]
-    resid_mean = torch.stack([metric["mean"] for metric in resid_mean])  # l i
-    assert resid_mean.shape == (transformer.n_layers, transformer.config.hidden_size)
+    l2_norms = [metric.compute() for metric in l2_norms]
+    df = pd.DataFrame([{k: v.item() for k, v in layer.items()} for layer in l2_norms])
+    df.index.name = "layer"
+    df.to_csv(os.path.join("out", f"resid_l2_norm_{model_name}.csv"))
+
+    means = [metric.compute() for metric in means]
+    means = torch.stack([metric["mean"] for metric in means])  # l i
+    assert means.shape == (transformer.n_layers, transformer.config.hidden_size)
 
     # Then, compute the mean cosine similarities between centered residual stream
     # activation vectors at adjacent layers
     for i, batch in tqdm(enumerate(dataloader), total=config.data.max_steps):
         x = transformer.forward(batch["input_ids"].to(device))
         x = einops.rearrange(x, "l b p i -> l (b p) i")
-        x = x - resid_mean.unsqueeze(1)
+        x = x - means.unsqueeze(1)
         x = normalize(x, -1)
         for layer in range(transformer.n_layers - 1):
             cos_sim = einops.einsum(x[layer], x[layer + 1], "bp i, bp i -> bp")
-            resid_cos_sim[layer].update(cos_sim.flatten())
+            cos_sims[layer].update(cos_sim.flatten())
         if i > config.data.max_steps:
             break
 
-    data = [metric.compute() for metric in resid_cos_sim]
-    return [{k: v.item() for k, v in layer.items()} for layer in data]
+    data = [metric.compute() for metric in cos_sims]
+    data = [{k: v.item() for k, v in layer.items()} for layer in data]
 
-
-def main(config: RunConfig, device: torch.device | str = "cpu") -> None:
-    data = get_resid_cos_sim(config, device)
-    filename = f"resid_cos_sim_{config.model_name.split('/')[-1]}.csv"
     df = pd.DataFrame(data)
     df.index.name = "start_at_layer"
-    df.to_csv(os.path.join("out", filename))
+    df.to_csv(os.path.join("out", f"resid_cos_sim_{model_name}.csv"))
 
 
 if __name__ == "__main__":
     config = parse(RunConfig)
     device = get_device()
     initialize(config.seed)
-    main(config, device)
+    save_resid_cos_sim(config, device)
