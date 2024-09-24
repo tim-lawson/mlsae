@@ -6,7 +6,7 @@ import torch
 from simple_parsing import field, parse
 from tqdm import tqdm
 
-from mlsae.model.data import DataConfig, get_train_dataloader
+from mlsae.model.data import DataConfig, get_test_dataloader
 from mlsae.model.decoder import scatter_topk
 from mlsae.model.lightning import MLSAETransformer
 from mlsae.trainer.config import SweepConfig, initialize
@@ -20,6 +20,9 @@ class Config(SweepConfig):
 
     seed: int = 42
     """The seed for global random state."""
+
+    filename: str = "variances.csv"
+    """The name of the file to save the results to."""
 
 
 class Metric:
@@ -48,8 +51,11 @@ class Metric:
         ell_sq = ((layers**2) * x).sum(dim=0)
         return ell_sq - ell**2
 
-    def update(self, probs: torch.Tensor):
-        assert probs.shape == (self.n_layers, self.n_tokens, self.n_latents)
+    def update(self, latents: torch.Tensor):
+        assert latents.shape == (self.n_layers, self.n_tokens, self.n_latents)
+
+        probs = latents / latents.sum(dim=0)
+        probs = probs.nan_to_num_(0.0)
 
         e_var_l_f = self.var(probs.mean(1)).mean()
         e_var_l_tf = self.var(probs).mean()
@@ -74,7 +80,6 @@ class Metric:
 @torch.no_grad()
 def get_variances(
     repo_id: str,
-    path: str,
     max_length: int,
     batch_size: int,
     max_steps: float,
@@ -82,12 +87,7 @@ def get_variances(
 ) -> dict:
     model = MLSAETransformer.from_pretrained(repo_id).to(device)
 
-    dataloader = get_train_dataloader(
-        path,
-        model.model_name,
-        max_length,
-        batch_size,
-    )
+    dataloader = get_test_dataloader(model.model_name, max_length, batch_size)
 
     tokens_per_step = batch_size * max_length
 
@@ -99,9 +99,8 @@ def get_variances(
 
         latents = scatter_topk(topk, model.n_latents)
         latents = einops.rearrange(latents, "l b t f -> l (b t) f")
-        probs = (latents / latents.sum(dim=0, keepdim=True)).nan_to_num(0.0)
 
-        metric.update(probs)
+        metric.update(latents)
 
         if i > max_steps:
             break
@@ -128,11 +127,10 @@ if __name__ == "__main__":
         rows.append(
             get_variances(
                 repo_id,
-                config.data.path,
                 config.data.max_length,
                 config.data.batch_size,
                 config.data.max_steps,
                 device=device,
             )
         )
-    pd.DataFrame(rows).to_csv("out/variances.csv", index=False)
+    pd.DataFrame(rows).to_csv(f"out/{config.filename}", index=False)

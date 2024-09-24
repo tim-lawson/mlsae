@@ -6,6 +6,7 @@ import pandas as pd
 import torch
 from simple_parsing import parse
 from tqdm import tqdm
+from tuned_lens import TunedLens
 
 from mlsae.model import Transformer
 from mlsae.model.data import get_test_dataloader
@@ -46,6 +47,25 @@ def save_resid_cos_sim(config: RunConfig, device: torch.device | str = "cpu") ->
     )
     transformer.model.to(device)  # type: ignore
 
+    lens = (
+        TunedLens.from_model_and_pretrained(
+            transformer.model,
+            transformer.model_name,
+            map_location=device,
+        )
+        if config.autoencoder.tuned_lens
+        else None
+    )
+    lens_name = "lens_" if lens is not None else ""
+
+    def forward_lens(inputs: torch.Tensor) -> torch.Tensor:
+        if lens is None:
+            return inputs
+        lens.to(inputs.device)
+        for layer in range(transformer.n_layers):
+            inputs[layer, ...] = lens.transform_hidden(inputs[layer, ...], layer)
+        return inputs
+
     dataloader = get_test_dataloader(
         config.model_name,
         config.data.max_length,
@@ -69,7 +89,7 @@ def save_resid_cos_sim(config: RunConfig, device: torch.device | str = "cpu") ->
     # First, compute the mean residual stream activation vectors over the dataset
     # https://www.lesswrong.com/s/6njwz6XdSYwNhtsCJ/p/eLNo7b56kQQerCzp2
     for i, batch in tqdm(enumerate(dataloader), total=config.data.max_steps):
-        x = transformer.forward(batch["input_ids"].to(device))
+        x = forward_lens(transformer.forward(batch["input_ids"].to(device)))
         x = einops.rearrange(x, "l b p i -> l (b p) i")
         for layer in range(transformer.n_layers):
             means[layer].update(x[layer, ...])
@@ -80,7 +100,7 @@ def save_resid_cos_sim(config: RunConfig, device: torch.device | str = "cpu") ->
     l2_norms = [metric.compute() for metric in l2_norms]
     df = pd.DataFrame([{k: v.item() for k, v in layer.items()} for layer in l2_norms])
     df.index.name = "layer"
-    df.to_csv(os.path.join("out", f"resid_l2_norm_{model_name}.csv"))
+    df.to_csv(os.path.join("out", f"resid_l2_norm_{lens_name}{model_name}.csv"))
 
     means = [metric.compute() for metric in means]
     means = torch.stack([metric["mean"] for metric in means])  # l i
@@ -89,7 +109,7 @@ def save_resid_cos_sim(config: RunConfig, device: torch.device | str = "cpu") ->
     # Then, compute the mean cosine similarities between centered residual stream
     # activation vectors at adjacent layers
     for i, batch in tqdm(enumerate(dataloader), total=config.data.max_steps):
-        x = transformer.forward(batch["input_ids"].to(device))
+        x = forward_lens(transformer.forward(batch["input_ids"].to(device)))
         x = einops.rearrange(x, "l b p i -> l (b p) i")
         x = x - means.unsqueeze(1)
         x = normalize(x, -1)
@@ -104,7 +124,7 @@ def save_resid_cos_sim(config: RunConfig, device: torch.device | str = "cpu") ->
 
     df = pd.DataFrame(data)
     df.index.name = "start_at_layer"
-    df.to_csv(os.path.join("out", f"resid_cos_sim_{model_name}.csv"))
+    df.to_csv(os.path.join("out", f"resid_cos_sim_{lens_name}{model_name}.csv"))
 
 
 if __name__ == "__main__":
