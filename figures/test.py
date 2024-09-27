@@ -1,6 +1,7 @@
 import os
 
 import pandas as pd
+from natsort import natsorted
 
 
 def parse_repo_id(repo_id: str) -> tuple[str, int, int, bool]:
@@ -46,9 +47,9 @@ if __name__ == "__main__":
         "k",
         "tuned_lens",
         "n_latents",
-    ] + columns
+    ] + natsorted(columns)
     df = df[columns]
-    df = df.sort_values(["model_name", "expansion_factor", "k", "tuned_lens"])
+    df = df.sort_values(["n_latents", "expansion_factor", "k", "tuned_lens"])
     df.to_csv("out/test.csv", index=False)
 
     is_70m = df["model_name"] == "pythia-70m-deduped"
@@ -72,4 +73,31 @@ if __name__ == "__main__":
     df[is_160m & is_k32 & ~is_tuned_lens].to_csv(
         "out/test_pythia-160m-deduped_expansion_factor.csv", index=False
     )
-    df[is_x64 & is_k32 & ~is_tuned_lens].to_csv("out/test_model_name.csv", index=False)
+
+    df = df[
+        [
+            "model_name",
+            "n_latents",
+            "train/fvu/avg",
+            "train/mse/avg",
+            "train/l1/avg",
+            "val/loss/delta/avg",
+            "val/logit/kldiv/avg",
+        ]
+    ]
+    df["model_name"] = (
+        df["model_name"].str.replace("pythia", "Pythia").str.replace("-deduped", "")
+    )
+    df = df.rename(
+        columns={
+            "model_name": "Model",
+            "n_latents": "Number of Latents",
+            "train/fvu/avg": "FVU",
+            "train/mse/avg": "MSE",
+            "train/l1/avg": "L1 Norm",
+            "val/loss/delta/avg": "Delta CE Loss",
+            "val/logit/kldiv/avg": "KL Divergence",
+        }
+    )
+    df = df[is_x64 & is_k32 & ~is_tuned_lens].transpose()
+    df.to_csv("out/test_model_name.csv", header=False, index=True)
