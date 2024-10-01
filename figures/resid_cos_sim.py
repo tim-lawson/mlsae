@@ -24,9 +24,10 @@ class VarianceMetric:
 
     def update(self, x: torch.Tensor) -> None:
         self.count += x.shape[0]
-        delta = x - self.mean
-        self.mean += torch.sum(delta, dim=0) / self.count
-        self.squared += torch.sum(delta * delta, dim=0)
+        delta1 = x - self.mean
+        self.mean += torch.sum(delta1, dim=0) / self.count
+        delta2 = x - self.mean
+        self.squared += torch.sum(delta1 * delta2, dim=0)
 
     def compute(self) -> dict[str, torch.Tensor]:
         var = self.squared / (self.count - 1)

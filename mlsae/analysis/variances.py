@@ -124,13 +124,15 @@ if __name__ == "__main__":
 
     rows: list[dict] = []
     for repo_id in config.repo_ids(transformer=True):
-        rows.append(
-            get_variances(
-                repo_id,
-                config.data.max_length,
-                config.data.batch_size,
-                config.data.max_steps,
-                device=device,
-            )
+        row = get_variances(
+            repo_id,
+            config.data.max_length,
+            config.data.batch_size,
+            config.data.max_steps,
+            device=device,
         )
+        pd.DataFrame({k: [v] for k, v in row.items()}).to_csv(
+            f"out/variances_{repo_id.split("/")[-1]}.csv", index=False
+        )
+        rows.append(row)
     pd.DataFrame(rows).to_csv(f"out/{config.filename}", index=False)

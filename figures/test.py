@@ -73,11 +73,13 @@ if __name__ == "__main__":
     df[is_160m & is_k32 & ~is_tuned_lens].to_csv(
         "out/test_pythia-160m-deduped_expansion_factor.csv", index=False
     )
+    df[is_160m & is_x64 & ~is_tuned_lens].to_csv(
+        "out/test_pythia-160m-deduped_k.csv", index=False
+    )
 
     df = df[
         [
             "model_name",
-            "n_latents",
             "train/fvu/avg",
             "train/mse/avg",
             "train/l1/avg",
@@ -91,7 +93,6 @@ if __name__ == "__main__":
     df = df.rename(
         columns={
             "model_name": "Model",
-            "n_latents": "Number of Latents",
             "train/fvu/avg": "FVU",
             "train/mse/avg": "MSE",
             "train/l1/avg": "L1 Norm",
@@ -99,5 +100,9 @@ if __name__ == "__main__":
             "val/logit/kldiv/avg": "KL Divergence",
         }
     )
-    df = df[is_x64 & is_k32 & ~is_tuned_lens].transpose()
-    df.to_csv("out/test_model_name.csv", header=False, index=True)
+    df[is_x64 & is_k32 & ~is_tuned_lens].transpose().to_csv(
+        "out/test_model_name.csv", header=False, index=True
+    )
+    df[is_x64 & is_k32 & is_tuned_lens].transpose().to_csv(
+        "out/test_lens_model_name.csv", header=False, index=True
+    )
