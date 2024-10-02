@@ -12,7 +12,7 @@ from safetensors.torch import load_file, save_file
 from simple_parsing import Serializable, field, parse
 from tqdm import tqdm
 
-from mlsae.model import DataConfig, MLSAETransformer, TopK, get_train_dataloader
+from mlsae.model import DataConfig, MLSAETransformer, TopK, get_test_dataloader
 from mlsae.trainer import initialize
 from mlsae.utils import get_device
 
@@ -31,10 +31,10 @@ class Config(Serializable):
     seed: int = 42
     """The seed for global random state."""
 
-    log_every_n_steps: int | None = None
+    log_every_n_steps: int | None = 8
     """The number of steps between logging statistics."""
 
-    push_to_hub: bool = True
+    push_to_hub: bool = False
     """Whether to push the dataset to HuggingFace."""
 
 
@@ -78,8 +78,7 @@ def get_tensors(
 ) -> dict[str, torch.Tensor]:
     model = MLSAETransformer.from_pretrained(config.repo_id).to(device)
 
-    dataloader = get_train_dataloader(
-        config.data.path,
+    dataloader = get_test_dataloader(
         model.model_name,
         config.data.max_length,
         config.data.batch_size,

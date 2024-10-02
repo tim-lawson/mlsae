@@ -17,5 +17,5 @@ if __name__ == "__main__":
         save_heatmap(
             dists.probs[:, indices].cpu(),
             os.path.join("out", filename),
-            figsize=(5.5, 1.75),
+            figsize=(5.5, 1.25),
         )

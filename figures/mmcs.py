@@ -1,4 +1,5 @@
 import os
+from dataclasses import dataclass
 
 import pandas as pd
 import torch
@@ -8,6 +9,12 @@ from tqdm import tqdm
 from mlsae.model import MLSAE
 from mlsae.trainer import SweepConfig, initialize
 from mlsae.utils import get_device, get_repo_id, normalize
+
+
+@dataclass
+class Config(SweepConfig):
+    filename: str = "mmcs.csv"
+    """The name of the file to save the results to."""
 
 
 @torch.no_grad()
@@ -49,7 +56,7 @@ def get_max_cos_sim(
 
 if __name__ == "__main__":
     device = get_device()
-    config = parse(SweepConfig)
+    config = parse(Config)
     initialize(config.seed)
 
     rows: list[dict[str, str | int | float]] = []
@@ -70,4 +77,4 @@ if __name__ == "__main__":
                 "sem": max_cos_sim.std().item() / max_cos_sim.size(0) ** 0.5,
             }
         )
-    pd.DataFrame(rows).to_csv(os.path.join("out", "mmcs.csv"), index=False)
+    pd.DataFrame(rows).to_csv(os.path.join("out", config.filename), index=False)

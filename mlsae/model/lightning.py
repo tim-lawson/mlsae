@@ -380,14 +380,16 @@ class MLSAETransformer(
         tokens = batch["input_ids"]
         inputs = self.forward_lens(self.transformer.forward(tokens))
         topk, recons, auxk, auxk_recons, dead = self.autoencoder.forward(inputs)
-        recons = self.inverse_lens(recons)
 
+        # NOTE: We compute the reconstruction error *before* the inverse lens
         train_metrics = self.train_metrics.forward(
             inputs=inputs,
             indices=topk.indices,
             values=topk.values,
             recons=recons,
         )
+
+        recons = self.inverse_lens(recons)
 
         self.forward_at_layer(inputs, recons, tokens)
         val_metrics = self.val_metrics.forward(
