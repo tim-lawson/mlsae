@@ -8,11 +8,9 @@ from transformers import (
     AutoTokenizer,
     GPTNeoXConfig,
     GPTNeoXForCausalLM,
+    GPTNeoXModel,
     PreTrainedTokenizer,
     PreTrainedTokenizerFast,
-)
-from transformers.models.gpt_neox.modeling_gpt_neox import (
-    _prepare_4d_causal_attention_mask,
 )
 
 
@@ -25,7 +23,7 @@ class Transformer(Module):
         skip_special_tokens: bool = True,
         # TODO: Check this works for non-consecutive layers
         layers: list[int] | None = None,
-        device: torch.device | str = "cpu",
+        device: torch.device | None = None,
     ) -> None:
         """
         Args:
@@ -47,6 +45,8 @@ class Transformer(Module):
         """
 
         super().__init__()
+
+        device = device or torch.device("cpu")
 
         self.model_name = model_name
         self.model: GPTNeoXForCausalLM = GPTNeoXForCausalLM.from_pretrained(model_name)  # type: ignore
@@ -74,13 +74,17 @@ class Transformer(Module):
             0, self.max_length, dtype=torch.long, device=device
         ).unsqueeze(0)
 
-        self.attention_mask: Tensor = _prepare_4d_causal_attention_mask(
-            attention_mask=None,
-            input_shape=(batch_size, max_length),
-            # We only actually need the device and dtype of the inputs
-            inputs_embeds=torch.empty(0, dtype=torch.float32, device=device),
-            past_key_values_length=0,
-        )  # type: ignore
+        self.attention_mask: Tensor = (
+            GPTNeoXModel._prepare_4d_causal_attention_mask_with_cache_position(
+                attention_mask=None,  # type: ignore
+                sequence_length=self.max_length,
+                target_length=self.max_length,
+                dtype=torch.float32,
+                device=device or torch.device("cpu"),
+                cache_position=torch.tensor(0),
+                batch_size=batch_size,
+            )
+        )
 
         self.loss = CrossEntropyLoss()
 
@@ -283,12 +287,15 @@ class Transformer(Module):
 
     def _attention_mask(self, tokens: Int[Tensor, "batch pos"]) -> Tensor:
         if tokens.shape != (self.batch_size, self.max_length):
-            return _prepare_4d_causal_attention_mask(
-                attention_mask=None,
-                input_shape=tokens.shape,
-                inputs_embeds=torch.empty(0, dtype=torch.float32, device=tokens.device),
-                past_key_values_length=0,
-            )  # type: ignore
+            return GPTNeoXModel._prepare_4d_causal_attention_mask_with_cache_position(
+                attention_mask=None,  # type: ignore
+                sequence_length=self.max_length,
+                target_length=self.max_length,
+                dtype=torch.float32,
+                device=tokens.device or torch.device("cpu"),
+                cache_position=torch.tensor(0),
+                batch_size=self.batch_size,
+            )
 
         return self.attention_mask.to(device=tokens.device)
 
