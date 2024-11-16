@@ -7,7 +7,6 @@ import numpy as np
 import pandas as pd
 import torch
 from datasets import Dataset, DatasetDict, load_dataset
-from loguru import logger
 from safetensors.torch import load_file, save_file
 from simple_parsing import Serializable, field, parse
 from tqdm import tqdm
@@ -233,7 +232,6 @@ class Dists:
     @staticmethod
     def repo_id(repo_id: str) -> str:
         if repo_id.endswith("-dists"):
-            logger.warning(f"repo_id {repo_id} already ends with '-dists'")
             return repo_id
         if repo_id.endswith("-tfm"):
             return repo_id.replace("-tfm", "-dists")

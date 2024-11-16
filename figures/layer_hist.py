@@ -17,11 +17,10 @@ class Config(SweepConfig):
     """Whether to plot the non-integer component of the center of mass."""
 
 
-if __name__ == "__main__":
-    device = get_device()
-    config = parse(Config)
+def main(
+    config: Config, device: torch.device, out: str | os.PathLike[str] = ".out"
+) -> None:
     initialize(config.seed)
-
     for repo_id in config.repo_ids():
         dists = Dists.load(repo_id, device)
         values = dists.layer_mean[~torch.isnan(dists.layer_mean)].cpu().numpy()
@@ -32,13 +31,17 @@ if __name__ == "__main__":
         if config.noninteger:
             values = numpy.abs(values - numpy.round(values))
             range = (0, 0.5)
-            filename = f"dists_histogram_noninteger_{repo_id}.csv"
+            filename = f"layer_hist_nonint_{repo_id}.csv"
         else:
             range = (0, dists.n_layers - 1)
-            filename = f"dists_histogram_{repo_id}.csv"
+            filename = f"layer_hist_{repo_id}.csv"
 
         hist, bins = numpy.histogram(values, bins=bins, range=range, density=True)
         hist = numpy.append(hist, 0)  # bins has one more element
         pd.DataFrame({"layer": bins, "density": hist}).to_csv(
-            os.path.join("out", filename), index=False
+            os.path.join(out, filename), index=False
         )
+
+
+if __name__ == "__main__":
+    main(parse(Config), get_device())

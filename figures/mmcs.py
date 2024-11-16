@@ -54,11 +54,10 @@ def get_max_cos_sim(
     return max_cos_sim.cpu(), mlsae.n_latents
 
 
-if __name__ == "__main__":
-    device = get_device()
-    config = parse(Config)
+def main(
+    config: Config, device: torch.device, out: str | os.PathLike[str] = ".out"
+) -> None:
     initialize(config.seed)
-
     rows: list[dict[str, str | int | float]] = []
     for model_name, expansion_factor, k in config:
         max_cos_sim, n_latents = get_max_cos_sim(
@@ -77,4 +76,8 @@ if __name__ == "__main__":
                 "sem": max_cos_sim.std().item() / max_cos_sim.size(0) ** 0.5,
             }
         )
-    pd.DataFrame(rows).to_csv(os.path.join("out", config.filename), index=False)
+    pd.DataFrame(rows).to_csv(os.path.join(out, config.filename), index=False)
+
+
+if __name__ == "__main__":
+    main(parse(Config), get_device())

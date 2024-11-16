@@ -93,6 +93,7 @@ def get_variances(
 
     metric = Metric(model.n_layers, tokens_per_step, model.n_latents, device)
 
+    i = 0
     for i, batch in enumerate(tqdm(dataloader, total=max_steps)):
         inputs = model.transformer.forward(batch["input_ids"].to(device))
         topk = model.autoencoder.encode(inputs).topk

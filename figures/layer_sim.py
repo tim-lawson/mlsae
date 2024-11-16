@@ -12,8 +12,8 @@ from mlsae.utils import get_device, normalize
 
 
 @torch.no_grad()
-def get_dists_cos_sim(
-    repo_id: str, device: torch.device | str = "cpu"
+def get_heatmap_data(
+    repo_id: str, device: torch.device
 ) -> tuple[torch.Tensor, torch.Tensor]:
     mlsae = MLSAE.from_pretrained(repo_id).to(device)
     W_dec = mlsae.decoder.weight.detach()
@@ -54,10 +54,14 @@ def save_heatmap(
     plt.close(fig)
 
 
-if __name__ == "__main__":
-    device = get_device()
-    config = parse(SweepConfig)
+def main(
+    config: SweepConfig, device: torch.device, out: str | os.PathLike[str] = ".out"
+) -> None:
     for repo_id in config.repo_ids(transformer=False):
-        filename = f"dists_cos_sim_heatmap_{repo_id.split('/')[-1]}.pdf"
-        x, y = get_dists_cos_sim(repo_id, device)
-        save_heatmap(x, y, os.path.join("out", filename))
+        filename = f"layer_sim_{repo_id.split('/')[-1]}.pdf"
+        x, y = get_heatmap_data(repo_id, device)
+        save_heatmap(x, y, os.path.join(out, filename))
+
+
+if __name__ == "__main__":
+    main(parse(SweepConfig), get_device())

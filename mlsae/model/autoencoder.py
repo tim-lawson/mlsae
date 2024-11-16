@@ -173,6 +173,7 @@ class MLSAE(
         topk = TopK(values, topk.indices)
         recons = self.decode(topk, stats)
 
+        auxk_recons = None
         if auxk is not None:
             auxk_values = torch.relu(auxk.values)
             auxk = TopK(auxk_values, auxk.indices)

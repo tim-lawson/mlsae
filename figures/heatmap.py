@@ -18,6 +18,7 @@ def save_heatmap(
 
     plt.rcParams.update({"axes.linewidth": 0})
     fig, ax = plt.subplots(1, 1, figsize=figsize, dpi=dpi)
+
     ax.imshow(data, cmap=cmap, aspect="auto", extent=extent, interpolation="nearest")
     ax.set_axis_off()
 

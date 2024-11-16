@@ -37,14 +37,16 @@ class VarianceMetric:
 
 
 @torch.no_grad()
-def save_resid_cos_sim(config: RunConfig, device: torch.device | str = "cpu") -> None:
+def main(config: RunConfig, device: torch.device) -> None:
+    initialize(config.seed)
+
     transformer = Transformer(
         config.model_name,
         config.data.max_length,
         config.data.batch_size,
         config.autoencoder.skip_special_tokens,
         layers=config.layers,
-        device=device,
+        device=torch.device(device),
     )
     transformer.model.to(device)  # type: ignore
 
@@ -129,7 +131,4 @@ def save_resid_cos_sim(config: RunConfig, device: torch.device | str = "cpu") ->
 
 
 if __name__ == "__main__":
-    config = parse(RunConfig)
-    device = get_device()
-    initialize(config.seed)
-    save_resid_cos_sim(config, device)
+    main(parse(RunConfig), get_device())
