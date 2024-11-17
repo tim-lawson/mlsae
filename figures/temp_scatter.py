@@ -1,7 +1,7 @@
 import os
 
+import numpy as np
 import torch
-from matplotlib import cm
 from matplotlib import pyplot as plt
 from simple_parsing import parse
 
@@ -13,25 +13,28 @@ from mlsae.utils import get_device
 def main(
     config: SweepConfig, device: torch.device, out: str | os.PathLike[str] = ".out"
 ) -> None:
+    figsize, dpi = (6, 6), 300
+
     for repo_id in config.repo_ids():
+        model_name = repo_id.split("/")[-1]
         dists = Dists.load(repo_id, device)
-        fig, ax = plt.subplots(1, 1, figsize=(6, 6), dpi=600)
-        colors = cm.get_cmap("rainbow")
-        colors.resampled(dists.n_layers)
-        for layer in range(dists.n_layers):
+
+        fig, ax = plt.subplots(1, 1, figsize=figsize, dpi=dpi)
+        ax.set_xlim(0, 1e7)
+        cmap = plt.colormaps["viridis"]
+        colors = cmap(np.linspace(0, 1), dists.n_layers)
+
+        for layer, color in zip(range(dists.n_layers), colors, strict=False):
             ax.scatter(
-                dists.counts[layer].cpu().numpy(),
-                dists.totals[layer].cpu().numpy(),
-                color=colors(layer),
+                dists.counts[layer],
+                dists.totals[layer],
+                s=2,
                 alpha=0.5,
+                color=color,
             )
-        ax.set_xlabel("Counts")
-        ax.set_ylabel("Totals")
-        ax.set_title(repo_id)
-        fig.savefig(
-            os.path.join(out, f"scatter_{repo_id.split('/')[-1]}.png"),
-            format="png",
-        )
+        ax.legend([f"Layer {i}" for i in range(dists.n_layers)], loc="upper left")
+
+        fig.savefig(os.path.join(out, f"scatter_freq_{model_name}.png"), format="png")
         plt.close(fig)
 
 

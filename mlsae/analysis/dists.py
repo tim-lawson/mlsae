@@ -160,6 +160,10 @@ class Dists:
         return self.totals / self.totals.sum(0)  # n_layers n_latents
 
     @cached_property
+    def entropies(self) -> torch.Tensor:
+        return -(self.probs * self.probs.log()).sum(0)  # n_latents
+
+    @cached_property
     def layer_mean(self) -> torch.Tensor:
         return (self.probs * self.layers).sum(0)  # n_latents
 
