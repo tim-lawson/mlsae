@@ -3,24 +3,23 @@ import weakref
 
 import torch
 
+from mlsae.model.lightning import MLSAETransformer
 
-def get_repo_id(
-    model_name: str,
-    expansion_factor: int,
-    k: int,
-    transformer: bool = False,
-    tuned_lens: bool = False,
-) -> str:
+
+def get_repo_id(model: MLSAETransformer, transformer: bool) -> str:
     """
     Get the repo_id that corresponds to the specified hyperparameters.
     You should probably change this!
     """
-    model_name = model_name.split("/")[-1]
-    repo_id = f"tim-lawson/mlsae-{model_name}-x{expansion_factor}-k{k}"
-    if tuned_lens:
+    model_name = model.model_name.split("/")[-1]
+    repo_id = f"tim-lawson/mlsae-{model_name}-x{model.expansion_factor}-k{model.k}"
+    if model.tuned_lens:
         repo_id += "-lens"
     if transformer:
         repo_id += "-tfm"
+    if model.layers is not None:
+        repo_id = repo_id.replace("mlsae", "sae")
+        repo_id += f"-layers-{''.join(map(str, model.layers))}"
     return repo_id
 
 
