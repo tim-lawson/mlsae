@@ -38,16 +38,16 @@ class FigureConfig:
     out: str
     """The directory to save the results to."""
 
-    heatmap_aggregate: bool = False
-    heatmap_prompt: bool = False
-    mmcs: bool = False
+    heatmap_aggregate: bool = True
+    heatmap_prompt: bool = True
+    mmcs: bool = True
 
     embed_sim: bool = False
     layer_std: bool = False
     layer_hist: bool = False
     layer_sim: bool = False
     heatmap_freq: bool = False
-    entropy: bool = True
+    entropy: bool = False
 
 
 def main(sweeps: list[FigureSweep]) -> None:
@@ -56,6 +56,8 @@ def main(sweeps: list[FigureSweep]) -> None:
     os.makedirs(config.out, exist_ok=True)
 
     for sweep in sweeps:
+        _ = sweep.__dict__.pop("id")
+        _ = sweep.__dict__.pop("enabled")
         sweep_dict = sweep.__dict__
 
         for mode in ["probs"]:
