@@ -7,19 +7,38 @@ from mlsae.model.lightning import MLSAETransformer
 
 
 def get_repo_id(model: MLSAETransformer, transformer: bool) -> str:
+    layers = None if model.layers == list(range(model.n_layers)) else model.layers
+    return get_repo_id_(
+        model_name=model.model_name,
+        expansion_factor=model.expansion_factor,
+        k=model.k,
+        tuned_lens=model.tuned_lens,
+        transformer=transformer,
+        layers=layers,
+    )
+
+
+def get_repo_id_(
+    model_name: str,
+    expansion_factor: int,
+    k: int,
+    tuned_lens: bool,
+    transformer: bool,
+    layers: list[int] | None = None,
+) -> str:
     """
     Get the repo_id that corresponds to the specified hyperparameters.
     You should probably change this!
     """
-    model_name = model.model_name.split("/")[-1]
-    repo_id = f"tim-lawson/mlsae-{model_name}-x{model.expansion_factor}-k{model.k}"
-    if model.tuned_lens:
+    model_name = model_name.split("/")[-1]
+    repo_id = f"tim-lawson/mlsae-{model_name}-x{expansion_factor}-k{k}"
+    if tuned_lens:
         repo_id += "-lens"
     if transformer:
         repo_id += "-tfm"
-    if model.layers is not None:
+    if layers is not None:
         repo_id = repo_id.replace("mlsae", "sae")
-        repo_id += f"-layers-{''.join(map(str, model.layers))}"
+        repo_id += f"-layers-{''.join(map(str, layers))}"
     return repo_id
 
 

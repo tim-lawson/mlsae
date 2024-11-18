@@ -8,18 +8,19 @@ from lightning.pytorch import Trainer
 from mlsae.model import MLSAETransformer
 from mlsae.model.data import get_test_dataloader
 from mlsae.trainer.config import RunConfig, initialize
-from mlsae.utils import get_repo_id
+from mlsae.utils import get_repo_id_
 
 
 def test(config: RunConfig) -> None:
     initialize(config.seed)
 
-    repo_id = get_repo_id(
+    repo_id = get_repo_id_(
         config.model_name,
         config.autoencoder.expansion_factor,
         config.autoencoder.k,
+        config.autoencoder.tuned_lens,
         transformer=True,
-        tuned_lens=config.autoencoder.tuned_lens,
+        layers=config.layers,
     )
 
     model = MLSAETransformer.from_pretrained(repo_id)
