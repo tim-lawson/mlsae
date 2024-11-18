@@ -14,8 +14,7 @@ from loguru import logger
 from simple_parsing import Serializable, field, parse
 from tqdm import tqdm
 
-from mlsae.model import DataConfig, MLSAETransformer
-from mlsae.model.data import get_train_dataloader
+from mlsae.model import DataConfig, MLSAETransformer, get_train_dataloader
 from mlsae.trainer import initialize
 from mlsae.utils import get_device
 

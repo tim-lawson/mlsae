@@ -6,9 +6,9 @@ import torch
 from mlsae.model.lightning import MLSAETransformer
 
 
-def get_repo_id(model: MLSAETransformer, transformer: bool) -> str:
+def get_model_repo_id(model: MLSAETransformer, transformer: bool) -> str:
     layers = None if model.layers == list(range(model.n_layers)) else model.layers
-    return get_repo_id_(
+    return get_repo_id(
         model_name=model.model_name,
         expansion_factor=model.expansion_factor,
         k=model.k,
@@ -18,7 +18,7 @@ def get_repo_id(model: MLSAETransformer, transformer: bool) -> str:
     )
 
 
-def get_repo_id_(
+def get_repo_id(
     model_name: str,
     expansion_factor: int,
     k: int,

@@ -31,7 +31,7 @@ from mlsae.model.autoencoder import (
     unit_norm_decoder_gradient,
 )
 from mlsae.model.geom_median import geometric_median
-from mlsae.model.transformer import Transformer
+from mlsae.model.transformers import GPT2Transformer, PythiaTransformer
 
 
 @dataclass
@@ -196,14 +196,27 @@ class MLSAETransformer(
             // (self.batch_size * self.max_length * self.accumulate_grad_batches)
         )
 
-        self.transformer = Transformer(
-            self.model_name,
-            self.max_length,
-            self.batch_size,
-            self.skip_special_tokens,
-            layers=layers,
-            device=self.device,
-        )
+        # TODO: Improve this...
+        if "pythia" in model_name:
+            self.transformer = PythiaTransformer(
+                self.model_name,
+                self.max_length,
+                self.batch_size,
+                self.skip_special_tokens,
+                layers=layers,
+                device=self.device,
+            )
+        elif "gpt2" in model_name:
+            self.transformer = GPT2Transformer(
+                self.model_name,
+                self.max_length,
+                self.batch_size,
+                self.skip_special_tokens,
+                layers=layers,
+                device=self.device,
+            )
+        else:
+            raise ValueError(f"Unknown model name: {model_name}")
         self.transformer.eval()
         self.transformer.requires_grad_(False)
 

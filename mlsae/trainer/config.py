@@ -8,7 +8,7 @@ from lightning.pytorch import seed_everything
 from simple_parsing import Serializable
 
 from mlsae.model import DataConfig, MLSAEConfig
-from mlsae.utils import get_repo_id_
+from mlsae.utils import get_repo_id
 
 
 @dataclass
@@ -91,7 +91,7 @@ class SweepConfig(Serializable):
 
     def repo_ids(self, transformer: bool = True) -> Generator[str, None, None]:
         for model_name, expansion_factor, k in self:
-            yield get_repo_id_(
+            yield get_repo_id(
                 model_name=model_name,
                 expansion_factor=expansion_factor,
                 k=k,

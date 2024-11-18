@@ -8,13 +8,13 @@ from lightning.pytorch import Trainer
 from mlsae.model import MLSAETransformer
 from mlsae.model.data import get_test_dataloader
 from mlsae.trainer.config import RunConfig, initialize
-from mlsae.utils import get_repo_id_
+from mlsae.utils import get_repo_id
 
 
 def test(config: RunConfig) -> None:
     initialize(config.seed)
 
-    repo_id = get_repo_id_(
+    repo_id = get_repo_id(
         config.model_name,
         config.autoencoder.expansion_factor,
         config.autoencoder.k,

@@ -6,9 +6,8 @@ import torch
 from simple_parsing import field, parse
 from tqdm import tqdm
 
-from mlsae.model.data import DataConfig, get_test_dataloader
+from mlsae.model import DataConfig, MLSAETransformer, get_test_dataloader
 from mlsae.model.decoder import scatter_topk
-from mlsae.model.lightning import MLSAETransformer
 from mlsae.trainer.config import SweepConfig, initialize
 from mlsae.utils import get_device
 
