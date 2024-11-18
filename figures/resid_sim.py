@@ -8,8 +8,7 @@ from simple_parsing import parse
 from tqdm import tqdm
 from tuned_lens import TunedLens
 
-from mlsae.model import Transformer
-from mlsae.model.data import get_test_dataloader
+from mlsae.model import PythiaTransformer, get_test_dataloader
 from mlsae.trainer import RunConfig, initialize
 from mlsae.utils import get_device, normalize
 
@@ -40,7 +39,7 @@ class VarianceMetric:
 def main(config: RunConfig, device: torch.device) -> None:
     initialize(config.seed)
 
-    transformer = Transformer(
+    transformer = PythiaTransformer(
         config.model_name,
         config.data.max_length,
         config.data.batch_size,

@@ -36,7 +36,9 @@ dependencies = [
 
 [tool.pytest.ini_options]
 minversion = "6.0"
-addopts = "-ra -q"
+addopts = "-ra -q --import-mode=importlib -m='not slow'"
+markers = ["slow: mark test as slow to run"]
+testpaths = ["mlsae"]
 
 [tool.ruff]
 extend-include = ["*.ipynb"]
