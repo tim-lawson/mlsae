@@ -7,14 +7,13 @@ from mlsae.model.lightning import MLSAETransformer
 
 
 def get_model_repo_id(model: MLSAETransformer, transformer: bool) -> str:
-    layers = None if model.layers == list(range(model.n_layers)) else model.layers
     return get_repo_id(
         model_name=model.model_name,
         expansion_factor=model.expansion_factor,
         k=model.k,
         tuned_lens=model.tuned_lens,
         transformer=transformer,
-        layers=layers,
+        layers=model.layers,
     )
 
 
