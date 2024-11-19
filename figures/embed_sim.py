@@ -8,7 +8,7 @@ import torch
 from simple_parsing import field, parse
 from transformers import AutoTokenizer, GPTNeoXForCausalLM
 
-from mlsae.model import MLSAE
+from mlsae.model import MLSAETransformer
 from mlsae.trainer.config import SweepConfig, initialize
 from mlsae.utils import get_device, get_repo_id, normalize
 
@@ -33,8 +33,7 @@ def get_similar_embeds(
     config: Config, repo_id: str, model_name: str, device: torch.device
 ) -> tuple[torch.Tensor, torch.Tensor]:
     tokenizer = AutoTokenizer.from_pretrained(model_name)
-
-    mlsae = MLSAE.from_pretrained(repo_id).to(device)
+    mlsae = MLSAETransformer.from_pretrained(repo_id).to(device).autoencoder
     W_dec = normalize(mlsae.decoder.weight)
     if len(config.latents) > 0:
         W_dec = W_dec[:, config.latents]
@@ -74,7 +73,13 @@ def main(
     initialize(config.seed)
     rows: list[dict[str, str | int | float]] = []
     for model_name, expansion_factor, k in config:
-        repo_id = get_repo_id(model_name, expansion_factor, k, False, config.tuned_lens)
+        repo_id = get_repo_id(
+            model_name=model_name,
+            expansion_factor=expansion_factor,
+            k=k,
+            tuned_lens=config.tuned_lens,
+            transformer=False,
+        )
         topk_in, topk_out = get_similar_embeds(config, repo_id, model_name, device)
         n_latents = topk_in.shape[0]
         rows.append(

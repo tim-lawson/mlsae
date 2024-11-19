@@ -1,3 +1,4 @@
+import os
 from dataclasses import dataclass
 
 import einops
@@ -77,35 +78,34 @@ class Metric:
 
 
 @torch.no_grad()
-def get_variances(
+def main(
     repo_id: str,
-    max_length: int,
-    batch_size: int,
-    max_steps: float,
+    data: DataConfig,
     device: torch.device | str = "cpu",
+    out: str | os.PathLike[str] = ".out",
 ) -> dict:
     model = MLSAETransformer.from_pretrained(repo_id).to(device)
 
-    dataloader = get_test_dataloader(model.model_name, max_length, batch_size)
+    dataloader = get_test_dataloader(model.model_name, data.max_length, data.batch_size)
 
-    tokens_per_step = batch_size * max_length
+    tokens_per_step = data.batch_size * data.max_length
 
     metric = Metric(model.n_layers, tokens_per_step, model.n_latents, device)
 
     i = 0
-    for i, batch in enumerate(tqdm(dataloader, total=max_steps)):
+    for i, batch in enumerate(tqdm(dataloader, total=data.max_steps)):
         inputs = model.transformer.forward(batch["input_ids"].to(device))
-        topk = model.autoencoder.encode(inputs).topk
+        topk, _, _, _ = model.autoencoder.encode(inputs)
 
         latents = scatter_topk(topk, model.n_latents)
         latents = einops.rearrange(latents, "l b t f -> l (b t) f")
 
         metric.update(latents)
 
-        if i > max_steps:
+        if i > data.max_steps:
             break
 
-    return {
+    row = {
         "model_name": model.model_name,
         "n_layers": model.n_layers,
         "n_latents": model.n_latents,
@@ -115,24 +115,21 @@ def get_variances(
         "tokens": (i + 1) * tokens_per_step,
         **metric.compute(),
     }
+    pd.DataFrame({k: [v] for k, v in row.items()}).to_csv(
+        os.path.join(out, f"variances_{repo_id.split("/")[-1]}.csv"), index=False
+    )
+    return row
+
+
+def sweep(
+    config: Config, device: torch.device, out: str | os.PathLike[str] = ".out"
+) -> None:
+    initialize(config.seed)
+    rows: list[dict] = []
+    for repo_id in config.repo_ids(transformer=True):
+        rows.append(main(repo_id, config.data, device=device))
+    pd.DataFrame(rows).to_csv(os.path.join(out, config.filename), index=False)
 
 
 if __name__ == "__main__":
-    device = get_device()
-    config = parse(Config)
-    initialize(config.seed)
-
-    rows: list[dict] = []
-    for repo_id in config.repo_ids(transformer=True):
-        row = get_variances(
-            repo_id,
-            config.data.max_length,
-            config.data.batch_size,
-            config.data.max_steps,
-            device=device,
-        )
-        pd.DataFrame({k: [v] for k, v in row.items()}).to_csv(
-            f"out/variances_{repo_id.split("/")[-1]}.csv", index=False
-        )
-        rows.append(row)
-    pd.DataFrame(rows).to_csv(f"out/{config.filename}", index=False)
+    sweep(parse(Config), get_device())

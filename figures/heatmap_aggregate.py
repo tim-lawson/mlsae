@@ -2,6 +2,7 @@ import os
 from dataclasses import dataclass
 
 import torch
+from matplotlib.colors import PowerNorm
 from simple_parsing import parse
 
 from figures.heatmap import save_heatmap
@@ -33,13 +34,14 @@ def get_heatmap_filename(repo_id: str, mode: str) -> str:
 def main(
     config: Config, device: torch.device, out: str | os.PathLike[str] = ".out"
 ) -> None:
+    norm = None if config.mode == "probs" else PowerNorm(0.5)
     for repo_id in config.repo_ids():
         dists = Dists.load(repo_id, device)
         _, indices = dists.layer_mean.sort(descending=True)
         save_heatmap(
             get_heatmap_data(dists, config.mode)[:, indices].cpu(),
             os.path.join(out, get_heatmap_filename(repo_id, config.mode)),
-            figsize=(5.5, 1.25),
+            norm=norm,
         )
 
 

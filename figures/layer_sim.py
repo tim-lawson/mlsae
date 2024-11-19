@@ -6,7 +6,7 @@ from matplotlib.colors import Colormap
 from simple_parsing import parse
 
 from mlsae.analysis.dists import Dists
-from mlsae.model import MLSAE
+from mlsae.model import MLSAETransformer
 from mlsae.trainer.config import SweepConfig
 from mlsae.utils import get_device, normalize
 
@@ -15,7 +15,7 @@ from mlsae.utils import get_device, normalize
 def get_heatmap_data(
     repo_id: str, device: torch.device
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    mlsae = MLSAE.from_pretrained(repo_id).to(device)
+    mlsae = MLSAETransformer.from_pretrained(repo_id).to(device).autoencoder
     W_dec = mlsae.decoder.weight.detach()
     W_dec = normalize(W_dec)
 

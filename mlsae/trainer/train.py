@@ -1,5 +1,4 @@
 import math
-import os
 from typing import cast
 
 import wandb
@@ -58,9 +57,6 @@ def train(config: RunConfig) -> None:
             save_dir="wandb_logs",
             project=config.project,
             log_model=True,
-            settings={
-                "program": os.path.join(os.getcwd(), "mlsae", "trainer", "train.py"),
-            },
         ),
         max_steps=config.trainer.max_steps
         or math.ceil(config.data.max_steps / config.trainer.accumulate_grad_batches),

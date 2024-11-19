@@ -6,7 +6,7 @@ import torch
 from simple_parsing import parse
 from tqdm import tqdm
 
-from mlsae.model import MLSAE
+from mlsae.model import MLSAETransformer
 from mlsae.trainer import SweepConfig, initialize
 from mlsae.utils import get_device, get_repo_id, normalize
 
@@ -27,8 +27,14 @@ def get_max_cos_sim(
     chunk_size: int = 1024,
     device: torch.device | str = "cpu",
 ) -> tuple[torch.Tensor, int]:
-    repo_id = get_repo_id(model_name, expansion_factor, k, False, tuned_lens)
-    mlsae = MLSAE.from_pretrained(repo_id).to(device)
+    repo_id = get_repo_id(
+        model_name=model_name,
+        expansion_factor=expansion_factor,
+        k=k,
+        tuned_lens=tuned_lens,
+        transformer=True,
+    )
+    mlsae = MLSAETransformer.from_pretrained(repo_id).to(device).autoencoder
     W_dec = normalize(mlsae.decoder.weight.detach())
 
     _, n_latents = W_dec.shape
@@ -61,7 +67,11 @@ def main(
     rows: list[dict[str, str | int | float]] = []
     for model_name, expansion_factor, k in config:
         max_cos_sim, n_latents = get_max_cos_sim(
-            model_name, expansion_factor, k, config.tuned_lens, device=device
+            model_name=model_name,
+            expansion_factor=expansion_factor,
+            k=k,
+            tuned_lens=config.tuned_lens,
+            device=device,
         )
         rows.append(
             {

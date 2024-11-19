@@ -33,7 +33,7 @@ class Config(Serializable):
     log_every_n_steps: int | None = 8
     """The number of steps between logging statistics."""
 
-    push_to_hub: bool = False
+    push_to_hub: bool = True
     """Whether to push the dataset to HuggingFace."""
 
 
@@ -249,7 +249,9 @@ class Dists:
         )
 
 
-def save_dists(config: Config, device: torch.device | str = "cpu") -> None:
+def main(config: Config, device: torch.device | str = "cpu") -> None:
+    initialize(config.seed)
+
     tensors = get_tensors(config, device)
     repo_id = Dists.repo_id(config.repo_id)
     filename = Dists.filename(repo_id)
@@ -267,7 +269,4 @@ def save_dists(config: Config, device: torch.device | str = "cpu") -> None:
 
 
 if __name__ == "__main__":
-    device = get_device()
-    config = parse(Config)
-    initialize(config.seed)
-    save_dists(config, device)
+    main(parse(Config), get_device())
