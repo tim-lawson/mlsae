@@ -22,7 +22,13 @@ def main(
     initialize(config.seed)
     rows: list[dict[str, str | int | float]] = []
     for model_name, expansion_factor, k in config:
-        repo_id = get_repo_id(model_name, expansion_factor, k, True, config.tuned_lens)
+        repo_id = get_repo_id(
+            model_name=model_name,
+            expansion_factor=expansion_factor,
+            k=k,
+            tuned_lens=config.tuned_lens,
+            transformer=True,
+        )
         dists = Dists.load(repo_id, device)
         stats = get_stats(dists.layer_std)
         rows.append(

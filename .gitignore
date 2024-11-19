@@ -179,4 +179,5 @@ wandb_logs
 
 data
 models
+!mlsae/**/models
 out

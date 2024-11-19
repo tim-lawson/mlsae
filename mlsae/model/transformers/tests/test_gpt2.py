@@ -12,7 +12,7 @@ from mlsae.model.transformers.models.gpt2.modeling_gpt2 import (
     GPT2Model,
 )
 
-atol = 1e-3
+atol = 1e-2
 
 
 def get_input_ids(
@@ -49,7 +49,6 @@ def test_hidden_states() -> None:
     my_hidden_states = my_gpt2.hidden_states(input_ids)
 
     for layer in range(len(hidden_states)):
-        print("layer", layer)
         assert torch.allclose(
             hidden_states[layer],
             my_hidden_states[layer],

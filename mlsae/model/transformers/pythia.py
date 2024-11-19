@@ -23,7 +23,6 @@ class PythiaTransformer(Module):
         max_length: int,
         batch_size: int,
         skip_special_tokens: bool = True,
-        # TODO: Check this works for non-consecutive layers
         layers: list[int] | None = None,
         device: torch.device | None = None,
     ) -> None:

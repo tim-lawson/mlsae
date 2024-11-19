@@ -56,11 +56,13 @@ def main(sweeps: list[FigureSweep]) -> None:
     os.makedirs(config.out, exist_ok=True)
 
     for sweep in sweeps:
+        if not sweep.enabled:
+            continue
         _ = sweep.__dict__.pop("id")
         _ = sweep.__dict__.pop("enabled")
         sweep_dict = sweep.__dict__
 
-        for mode in ["probs"]:
+        for mode in ["probs", "counts", "totals"]:
             if config.heatmap_aggregate:
                 heatmap_aggregate_config = heatmap_aggregate.Config(
                     **sweep_dict, mode=mode

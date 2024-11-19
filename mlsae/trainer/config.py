@@ -89,13 +89,15 @@ class SweepConfig(Serializable):
     def __iter__(self) -> Generator[tuple[str, int, int], None, None]:
         yield from product(self.model_name, self.expansion_factor, self.k)
 
-    def repo_ids(self, transformer: bool = True) -> Generator[str, None, None]:
+    def repo_ids(
+        self, transformer: bool = True, tuned_lens: bool = False
+    ) -> Generator[str, None, None]:
         for model_name, expansion_factor, k in self:
             yield get_repo_id(
                 model_name=model_name,
                 expansion_factor=expansion_factor,
                 k=k,
-                tuned_lens=self.tuned_lens,
+                tuned_lens=tuned_lens,
                 transformer=transformer,
             )
 

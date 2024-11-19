@@ -24,9 +24,9 @@ from mlsae.metrics import (
     LayerwiseWrapper,
     MSELoss,
 )
-from mlsae.model.autoencoder import (
-    MLSAE,
-    AutoencoderOutput,
+from mlsae.model.autoencoders import (
+    TopKSAE,
+    TopKSAEOut,
     unit_norm_decoder,
     unit_norm_decoder_gradient,
 )
@@ -89,14 +89,7 @@ def create_untransform_hidden(tuned_lens: TunedLens):
     return untransform_hidden
 
 
-class MLSAETransformer(
-    LightningModule,
-    PyTorchModelHubMixin,
-    repo_url="https://github.com/tim-lawson/mlsae",
-    language="en",
-    library_name="mlsae",
-    license="mit",
-):
+class MLSAETransformer(PyTorchModelHubMixin, LightningModule):
     loss_true: Float[torch.Tensor, "n_layers"]
     loss_pred: Float[torch.Tensor, "n_layers"]
     logits_true: Float[torch.Tensor, "n_layers pos d_vocab"]
@@ -105,7 +98,6 @@ class MLSAETransformer(
     def __init__(
         self,
         model_name: str = "EleutherAI/pythia-70m-deduped",
-        # TODO: Check this works for non-consecutive layers
         layers: list[int] | None = None,
         expansion_factor: int = 16,
         k: int = 32,
@@ -133,7 +125,8 @@ class MLSAETransformer(
         - [Bricken et al., 2023. Towards Monosemanticity.](https://transformer-circuits.pub/2023/monosemantic-features)
 
         Args:
-            model_name (str): The name of a pretrained GPTNeoXForCausalLM model.
+            model_name (str): The name of a pretrained GPTNeoXForCausalLM or
+                GPT2LMHeadModel model.
 
             layers (list[int] | None): The layers to train on.
                 If None, all layers are trained on. Defaults to None.
@@ -227,7 +220,7 @@ class MLSAETransformer(
 
         self.save_hyperparameters(ignore=["autoencoder", "transformer"])
 
-        self.autoencoder: MLSAE = MLSAE(
+        self.autoencoder: TopKSAE = TopKSAE(
             self.n_inputs,
             self.n_latents,
             self.k,
@@ -291,11 +284,11 @@ class MLSAETransformer(
         self.register_buffer("logits_true", torch.zeros(logits))
         self.register_buffer("logits_pred", torch.zeros(logits))
 
-    def forward(self, tokens: Int[torch.Tensor, "batch pos"]) -> AutoencoderOutput:
+    def forward(self, tokens: Int[torch.Tensor, "batch pos"]) -> TopKSAEOut:
         inputs = self.forward_lens(self.transformer.forward(tokens))
         topk, recons, auxk, auxk_recons, dead = self.autoencoder.forward(inputs)
         recons = self.inverse_lens(recons)
-        return AutoencoderOutput(topk, recons, auxk, auxk_recons, dead)
+        return TopKSAEOut(topk, recons, auxk, auxk_recons, dead)
 
     def forward_lens(
         self, inputs: Float[torch.Tensor, "layer batch pos n_inputs"]
