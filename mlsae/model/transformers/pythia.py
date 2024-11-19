@@ -92,7 +92,7 @@ class PythiaTransformer(Module):
     @torch.no_grad()
     def forward(
         self, tokens: Int[Tensor, "batch pos"]
-    ) -> Float[Tensor, "n_layers batch pos d_model"]:
+    ) -> Float[Tensor, "layer batch pos d_model"]:
         """
         Returns the residual stream activation vectors from the specified layers.
 
@@ -100,7 +100,7 @@ class PythiaTransformer(Module):
             tokens (Int[Tensor, "batch pos"]): The input tokens.
 
         Returns:
-            out (Float[Tensor, "n_layers batch pos d_model"]): The residual stream
+            out (Float[Tensor, "layer batch pos d_model"]): The residual stream
                 activation vectors from the specified layers.
         """
 

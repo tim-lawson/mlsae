@@ -95,7 +95,7 @@ def main(
     i = 0
     for i, batch in enumerate(tqdm(dataloader, total=data.max_steps)):
         inputs = model.transformer.forward(batch["input_ids"].to(device))
-        topk, _, _, _ = model.autoencoder.encode(inputs)
+        topk, auxk, stats, dead = model.autoencoder.encode(inputs)
 
         latents = scatter_topk(topk, model.n_latents)
         latents = einops.rearrange(latents, "l b t f -> l (b t) f")

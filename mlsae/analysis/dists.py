@@ -90,7 +90,7 @@ def get_tensors(
 
     for i, batch in enumerate(tqdm(dataloader, total=config.data.max_steps)):
         inputs = model.transformer.forward(batch["input_ids"].to(device))
-        topk = model.autoencoder.encode(inputs).topk
+        topk, auxk, stats, dead = model.autoencoder.encode(inputs)
         metric.update(topk)
 
         if config.log_every_n_steps is not None and i % config.log_every_n_steps == 0:

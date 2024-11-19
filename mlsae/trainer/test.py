@@ -24,8 +24,7 @@ def test(config: RunConfig) -> None:
     )
 
     model = MLSAETransformer.from_pretrained(repo_id)
-    # model.requires_grad_(False)
-    print(model)
+    model.requires_grad_(False)
 
     dataloader = get_test_dataloader(
         config.model_name,

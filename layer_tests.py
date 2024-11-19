@@ -1,18 +1,13 @@
 import os
-from typing import cast
+from pprint import pprint
 
 import pandas as pd
 import torch
-from lightning.fabric.plugins.precision.precision import _PRECISION_INPUT
-from lightning.pytorch import Trainer
 from torch.utils.data import DataLoader
 
-from mlsae.model import DataConfig, MLSAETransformer
-from mlsae.model.data import get_test_dataloader
-from mlsae.model.types import TopK
-from mlsae.trainer import RunConfig
-from mlsae.trainer.config import initialize
-from mlsae.utils import get_device
+from mlsae.model import DataConfig, MLSAETransformer, TopK, TopKSAE, get_test_dataloader
+from mlsae.trainer import RunConfig, initialize
+from mlsae.utils import get_device, get_repo_id
 
 pythia_70m = "EleutherAI/pythia-70m-deduped"
 pythia_160m = "EleutherAI/pythia-160m-deduped"
@@ -26,17 +21,37 @@ layers = {
     # pythia_1b: range(16),
 }
 
-config = RunConfig(data=DataConfig(max_tokens=1_000_000))
+config = RunConfig(data=DataConfig(max_tokens=10_000_000))
 
 
-def test(repo_id: str, layer: int):
-    device = get_device()
+def test(model_name: str, layer: int):
     initialize(config.seed)
+    device = get_device()
 
-    model = MLSAETransformer.from_pretrained(repo_id)
-    model.requires_grad_(False)
-    model.layers = [layer]
+    # NOTE: This is a hack. We want to feed an SAE trained at layer i with the input
+    # activations from every layer. So, we:
+    #
+    #   1. load the multi-layer SAE + transformer harness
+    model_repo_id = get_repo_id(model_name, 64, 32, False, True)
+    model = MLSAETransformer.from_pretrained(model_repo_id)
     model = model.to(device)
+
+    #   2. load the layer-specific SAE
+    autoencoder_repo_id = get_repo_id(model_name, 64, 32, False, False, [layer])
+    autoencoder = TopKSAE.from_pretrained(
+        autoencoder_repo_id,
+        # TODO: not sure why these aren't taken from config.json
+        n_inputs=model.n_inputs,
+        n_latents=model.n_latents,
+        k=model.k,
+        dead_steps_threshold=model.dead_steps_threshold,
+    )
+    autoencoder = autoencoder.to(device)
+
+    #   3. replace the autoencoder with the layer-specific one
+    model.autoencoder = autoencoder
+
+    print(model.layers)
 
     dataloader = get_test_dataloader(
         model.model_name,
@@ -48,11 +63,10 @@ def test(repo_id: str, layer: int):
     # output = test_lightning(model, dataloader)
     output = test_manual(model, dataloader, device)
     output = {k: v.item() for k, v in output.items()}
-    print(output)
+    pprint(output)
 
-    del model
-
-    filename = f"test_{repo_id.split('/')[-1]}.csv"
+    filename_repo_id = get_repo_id(model_name, 64, 32, False, True, [layer])
+    filename = f"test_{filename_repo_id.split('/')[-1]}.csv"
     pd.DataFrame(output, index=[0]).to_csv(os.path.join("out", filename), index=False)
 
 
@@ -66,7 +80,9 @@ def test_manual(
         tokens: torch.Tensor = batch["input_ids"].to(device)
         inputs = model.forward_lens(model.transformer.forward(tokens))
 
-        # TODO: forgive me, o lord
+        # NOTE: This is also a hack. We want the input activations to be normalized
+        # independently for each layer. So, we feed them to the SAE one layer at a time
+        # and combine the results.
         recons = torch.empty(inputs.shape, device=device)
         topk = TopK(
             torch.empty(
@@ -78,7 +94,7 @@ def test_manual(
                 device=device,
             ),
         )
-        for layer in range(inputs.shape[0]):
+        for layer in range(model.n_layers):
             topk_, recons_, _, _, _ = model.autoencoder.forward(inputs[layer])
             recons[layer] = recons_
             topk.indices[layer] = topk_.indices
@@ -111,26 +127,13 @@ def test_manual(
     }
 
 
-# TODO: I don't trust this.
-def test_lightning(model: MLSAETransformer, dataloader: DataLoader[torch.Tensor]):
-    trainer = Trainer(
-        precision=cast(_PRECISION_INPUT, config.trainer.precision),
-        limit_test_batches=config.data.max_steps,
-        deterministic=True,
-    )
-    return trainer.test(model, dataloaders=dataloader)
-
-
 def main() -> None:
-    for repo_id, layer in [
-        ("tim-lawson/sae-pythia-70m-deduped-x64-k32-tfm-layers-0", 0),
-        ("tim-lawson/sae-pythia-70m-deduped-x64-k32-tfm-layers-1", 1),
-        ("tim-lawson/sae-pythia-70m-deduped-x64-k32-tfm-layers-2", 2),
-        ("tim-lawson/sae-pythia-70m-deduped-x64-k32-tfm-layers-3", 3),
-        ("tim-lawson/sae-pythia-70m-deduped-x64-k32-tfm-layers-4", 4),
-        ("tim-lawson/sae-pythia-70m-deduped-x64-k32-tfm-layers-5", 5),
-    ]:
-        test(repo_id, layer)
+    for model_name in [pythia_70m, pythia_160m]:
+        for layer in layers[model_name]:
+            try:
+                test(model_name, layer)
+            except Exception as e:
+                print(e)
 
 
 if __name__ == "__main__":

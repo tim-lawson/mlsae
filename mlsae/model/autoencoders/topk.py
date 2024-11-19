@@ -50,7 +50,7 @@ class TopKSAE(Module, PyTorchModelHubMixin):
         Args:
             n_inputs (int): The number of inputs.
 
-            n_latents(int): The number of latents.
+            n_latents (int): The number of latents.
 
             k (int): The number of largest latents to keep.
 

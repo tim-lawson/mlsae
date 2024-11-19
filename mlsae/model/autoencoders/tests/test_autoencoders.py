@@ -5,7 +5,7 @@ from mlsae.model.decoder import scatter_topk
 
 
 @torch.no_grad()
-def test_saes() -> None:
+def test_autoencoders() -> None:
     n_inputs = 512
     n_latents = 64 * n_inputs
     dead_steps_threshold = 10_000_000

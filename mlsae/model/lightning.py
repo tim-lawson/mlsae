@@ -89,7 +89,7 @@ def create_untransform_hidden(tuned_lens: TunedLens):
     return untransform_hidden
 
 
-class MLSAETransformer(PyTorchModelHubMixin, LightningModule):
+class MLSAETransformer(LightningModule, PyTorchModelHubMixin):
     loss_true: Float[torch.Tensor, "n_layers"]
     loss_pred: Float[torch.Tensor, "n_layers"]
     logits_true: Float[torch.Tensor, "n_layers pos d_vocab"]

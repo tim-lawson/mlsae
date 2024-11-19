@@ -38,7 +38,7 @@ class DeadLatents(Metric):
         self, indices: Int[torch.Tensor, "n_layers batch pos k"], **kwargs
     ) -> None:
         self.latent_tokens.add_(
-            torch.bincount(indices.reshape(-1), minlength=self.n_latents)
+            torch.bincount(indices.int().reshape(-1), minlength=self.n_latents)
         )
         self.tokens += indices.shape[1] * indices.shape[2]
 
