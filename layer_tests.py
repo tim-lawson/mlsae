@@ -51,8 +51,6 @@ def test(model_name: str, layer: int):
     #   3. replace the autoencoder with the layer-specific one
     model.autoencoder = autoencoder
 
-    print(model.layers)
-
     dataloader = get_test_dataloader(
         model.model_name,
         config.data.max_length,
@@ -60,7 +58,6 @@ def test(model_name: str, layer: int):
         config.data.num_workers or 1,
     )
 
-    # output = test_lightning(model, dataloader)
     output = test_manual(model, dataloader, device)
     output = {k: v.item() for k, v in output.items()}
     pprint(output)
@@ -121,9 +118,9 @@ def test_manual(
     return {
         **model.train_metrics.compute(),
         **model.val_metrics.compute(),
-        "mse_loss": model.mse_loss.compute(),
-        "aux_loss": model.aux_loss.compute(),
-        "loss": model.mse_loss.compute() + model.aux_loss.compute(),
+        "loss/mse": model.mse_loss.compute(),
+        "loss/auxk": model.aux_loss.compute(),
+        "loss/total": model.mse_loss.compute() + model.aux_loss.compute(),
     }
 
 
