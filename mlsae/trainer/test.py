@@ -20,7 +20,6 @@ def test(config: RunConfig) -> None:
         k=config.autoencoder.k,
         tuned_lens=config.autoencoder.tuned_lens,
         transformer=True,
-        layers=config.layers,
     )
 
     model = MLSAETransformer.from_pretrained(repo_id)

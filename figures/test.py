@@ -36,7 +36,7 @@ def matrix_plot(
     rows = []
     for train_layer in df["layer"].unique():
         if train_layer is None:
-            train_layer = 6
+            train_layer = -1
             row = df[df["layer"].isnull()].iloc[0]
         else:
             row = df[df["layer"] == train_layer].iloc[0]

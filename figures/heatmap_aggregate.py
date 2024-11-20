@@ -54,9 +54,7 @@ def sweep(
         main(repo_id, config.mode, device, out)
 
 
-if __name__ == "__main__":
-    device = get_device()
-    # sweep(parse(Config), device)
+def sweep_layers() -> None:
     for repo_id in [
         "tim-lawson/sae-pythia-70m-deduped-x64-k32-tfm-layers-0-dists",
         "tim-lawson/sae-pythia-70m-deduped-x64-k32-tfm-layers-1-dists",
@@ -64,7 +62,24 @@ if __name__ == "__main__":
         "tim-lawson/sae-pythia-70m-deduped-x64-k32-tfm-layers-3-dists",
         "tim-lawson/sae-pythia-70m-deduped-x64-k32-tfm-layers-4-dists",
         "tim-lawson/sae-pythia-70m-deduped-x64-k32-tfm-layers-5-dists",
+        "tim-lawson/sae-pythia-160m-deduped-x64-k32-tfm-layers-0-dists",
+        "tim-lawson/sae-pythia-160m-deduped-x64-k32-tfm-layers-1-dists",
+        "tim-lawson/sae-pythia-160m-deduped-x64-k32-tfm-layers-2-dists",
+        "tim-lawson/sae-pythia-160m-deduped-x64-k32-tfm-layers-3-dists",
+        "tim-lawson/sae-pythia-160m-deduped-x64-k32-tfm-layers-4-dists",
+        "tim-lawson/sae-pythia-160m-deduped-x64-k32-tfm-layers-5-dists",
+        "tim-lawson/sae-pythia-160m-deduped-x64-k32-tfm-layers-6-dists",
+        "tim-lawson/sae-pythia-160m-deduped-x64-k32-tfm-layers-7-dists",
+        "tim-lawson/sae-pythia-160m-deduped-x64-k32-tfm-layers-8-dists",
+        "tim-lawson/sae-pythia-160m-deduped-x64-k32-tfm-layers-9-dists",
+        "tim-lawson/sae-pythia-160m-deduped-x64-k32-tfm-layers-10-dists",
+        "tim-lawson/sae-pythia-160m-deduped-x64-k32-tfm-layers-11-dists",
     ]:
         main(repo_id, "probs", device)
         main(repo_id, "counts", device)
         main(repo_id, "totals", device)
+
+
+if __name__ == "__main__":
+    device = get_device()
+    sweep(parse(Config), device)
