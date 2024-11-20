@@ -9,9 +9,16 @@ from natsort import natsorted
 
 def parse_mlsae_repo_id(repo_id: str) -> tuple[str, int, int, bool]:
     split = repo_id.split("-")
-    model_name = split[1] + "-" + split[2] + "-" + split[3]
-    expansion_factor = int(split[4].lstrip("x"))
-    k = int(split[5].lstrip("k"))
+    if split[1] == "pythia":
+        model_name = split[1] + "-" + split[2] + "-" + split[3]
+        expansion_factor = int(split[4].lstrip("x"))
+        k = int(split[5].lstrip("k"))
+    elif split[1] == "gpt2":
+        model_name = split[1]
+        expansion_factor = int(split[2].lstrip("x"))
+        k = int(split[3].lstrip("k"))
+    else:
+        raise ValueError(f"unknown model: {split[1]}")
     tuned_lens = "-lens" in repo_id
     return model_name, expansion_factor, k, tuned_lens
 
@@ -194,7 +201,21 @@ if __name__ == "__main__":
         ]
     ]
     df["model_name"] = (
-        df["model_name"].str.replace("pythia", "Pythia").str.replace("-deduped", "")
+        df["model_name"]
+        .str.replace("pythia", "Pythia")
+        .str.replace("-deduped", "")
+        .str.replace("gpt2", "GPT-2 small")
+    )
+    df["model_name"] = pd.Categorical(
+        df["model_name"],
+        categories=[
+            "Pythia-70m",
+            "Pythia-160m",
+            "Pythia-410m",
+            "Pythia-1b",
+            "Pythia-1.4b",
+            "GPT-2 small",
+        ],
     )
     df = df.rename(
         columns={
@@ -206,9 +227,10 @@ if __name__ == "__main__":
             "val/logit/kldiv/avg": "KL Divergence",
         }
     )
-    df[is_x64 & is_k32 & ~is_tuned_lens & ~is_layer].transpose().to_csv(
+    is_14b = df["Model"] == "Pythia-1.4b"
+    df[~is_14b & is_x64 & is_k32 & ~is_tuned_lens & ~is_layer].transpose().to_csv(
         "out/test_model_name.csv", header=False, index=True
     )
-    df[is_x64 & is_k32 & is_tuned_lens & ~is_layer].transpose().to_csv(
+    df[~is_14b & is_x64 & is_k32 & is_tuned_lens & ~is_layer].transpose().to_csv(
         "out/test_lens_model_name.csv", header=False, index=True
     )

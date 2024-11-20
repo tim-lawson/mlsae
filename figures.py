@@ -19,6 +19,7 @@ pythia_70m = "EleutherAI/pythia-70m-deduped"
 pythia_160m = "EleutherAI/pythia-160m-deduped"
 pythia_410m = "EleutherAI/pythia-410m-deduped"
 pythia_1b = "EleutherAI/pythia-1b-deduped"
+gpt2_small = "openai-community/gpt2"
 
 expansion_factors = [1, 2, 4, 8, 16, 32, 64, 128, 256]
 ks = [16, 32, 64, 128, 256, 512]
@@ -29,7 +30,7 @@ class FigureSweep(SweepConfig):
     id: str | None = None
     """The identifier to use for filenames."""
 
-    enabled: bool = True
+    enabled: bool = False
     """Whether to enable this sweep."""
 
 
@@ -167,6 +168,15 @@ sweeps: list[FigureSweep] = [
         expansion_factor=[64],
         k=ks,
         tuned_lens=True,
+    ),
+    # GPT-2 for R = 64 and k = 32
+    FigureSweep(
+        id="gpt2",
+        model_name=[gpt2_small],
+        expansion_factor=[64],
+        k=[32],
+        tuned_lens=False,
+        enabled=True,
     ),
 ]
 

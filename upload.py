@@ -51,5 +51,9 @@ def upload_models(ckpt_path: str) -> None:
 
 
 if __name__ == "__main__":
-    for path in find_ckpt_paths():
+    for path in find_ckpt_paths(step=7616):
+        upload_models(path)
+
+    # NOTE: GPT-2 has max_length 1024, so we have twice as many steps for 1B tokens.
+    for path in find_ckpt_paths(step=15232):
         upload_models(path)

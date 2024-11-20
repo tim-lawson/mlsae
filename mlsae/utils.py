@@ -7,13 +7,16 @@ from mlsae.model import MLSAETransformer, TopK, TopKSAE
 
 
 def get_model_repo_id(model: MLSAETransformer, transformer: bool) -> str:
+    # NOTE: This is a hack. At the moment, we only distinguish between models trained on
+    # a single layer and models trained on all layers.
+    layers = None if len(model.layers) > 1 else model.layers
     return get_repo_id(
         model_name=model.model_name,
         expansion_factor=model.expansion_factor,
         k=model.k,
         tuned_lens=model.tuned_lens,
         transformer=transformer,
-        layers=model.layers,
+        layers=layers,
     )
 
 
