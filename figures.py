@@ -67,7 +67,7 @@ def main(sweeps: list[FigureSweep]) -> None:
                 heatmap_aggregate_config = heatmap_aggregate.Config(
                     **sweep_dict, mode=mode
                 )
-                heatmap_aggregate.main(heatmap_aggregate_config, device, config.out)
+                heatmap_aggregate.sweep(heatmap_aggregate_config, device, config.out)
 
             if config.heatmap_prompt:
                 heatmap_prompt_config = heatmap_prompt.Config(**sweep_dict, mode=mode)

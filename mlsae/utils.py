@@ -3,7 +3,7 @@ import weakref
 
 import torch
 
-from mlsae.model.lightning import MLSAETransformer
+from mlsae.model import MLSAETransformer, TopK, TopKSAE
 
 
 def get_model_repo_id(model: MLSAETransformer, transformer: bool) -> str:
@@ -74,3 +74,62 @@ def cache_method(*lru_args, **lru_kwargs):
         return wrapped_func
 
     return decorator
+
+
+def load_single_layer(
+    model_name: str,
+    layer: int,
+    device: torch.device,
+    expansion_factor: int = 64,
+    k: int = 32,
+    tuned_lens: bool = False,
+) -> MLSAETransformer:
+    # NOTE: This is a hack. We want to feed an SAE trained at layer i with the input
+    # activations from every layer. So, we:
+    #   1. Load the multi-layer SAE and underlying transformer
+    model_repo_id = get_repo_id(model_name, expansion_factor, k, tuned_lens, True)
+    model = MLSAETransformer.from_pretrained(model_repo_id)
+    model = model.to(device)
+    #   2. Load the layer-specific SAE only
+    autoencoder_repo_id = get_repo_id(
+        model_name, expansion_factor, k, tuned_lens, False, [layer]
+    )
+    autoencoder = TopKSAE.from_pretrained(
+        autoencoder_repo_id,
+        # TODO: These should be taken from config.json
+        n_inputs=model.n_inputs,
+        n_latents=model.n_latents,
+        k=model.k,
+        dead_steps_threshold=model.dead_steps_threshold,
+    )
+    autoencoder = autoencoder.to(device)
+    #   3. Replace the SAE in the multi-layer model with the layer-specific one
+    model.autoencoder = autoencoder
+    return model
+
+
+# NOTE: This is also a hack. We want the input activations to be normalized
+# independently for each layer. So, we feed them to the SAE one layer at a time
+# and combine the results.
+def forward_single_layer(
+    model: MLSAETransformer, tokens: torch.Tensor
+) -> tuple[torch.Tensor, torch.Tensor, TopK]:
+    inputs = model.forward_lens(model.transformer.forward(tokens))
+    recons = torch.empty(inputs.shape, device=model.device)
+    topk = TopK(
+        values=torch.empty(
+            (model.n_layers, model.batch_size, model.max_length, model.k),
+            device=model.device,
+        ),
+        indices=torch.empty(
+            (model.n_layers, model.batch_size, model.max_length, model.k),
+            device=model.device,
+            dtype=torch.long,
+        ),
+    )
+    for layer in range(model.n_layers):
+        topk_, recons_, _, _, _ = model.autoencoder.forward(inputs[layer])
+        recons[layer] = recons_
+        topk.indices[layer] = topk_.indices
+        topk.values[layer] = topk_.values
+    return inputs, recons, topk

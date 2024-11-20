@@ -1,6 +1,7 @@
 # TODO: tidy this up
 
 import os
+import re
 
 import pandas as pd
 from natsort import natsorted
@@ -23,6 +24,28 @@ def parse_sae_repo_id(repo_id: str) -> tuple[str, int, int, bool, int]:
     tuned_lens = "-lens" in repo_id
     layer = int(split[8].rstrip(".csv"))
     return model_name, expansion_factor, k, tuned_lens, layer
+
+
+def matrix_plot(
+    df: pd.DataFrame,
+    filename: str,
+    pattern: str | re.Pattern[str] = r"train/fvu/layer_\d+",
+) -> None:
+    cols = [col for col in df.columns if re.match(pattern, col)]
+    cols.sort(key=lambda x: int(x.split("_")[-1]))
+    rows = []
+    for train_layer in df["layer"].unique():
+        if train_layer is None:
+            train_layer = 6
+            row = df[df["layer"].isnull()].iloc[0]
+        else:
+            row = df[df["layer"] == train_layer].iloc[0]
+        for col in cols:
+            rows.append(
+                {"x": int(col.split("_")[-1]), "y": train_layer, "value": row[col]}
+            )
+    rows = [row for row in rows if not pd.isna(row["value"])]
+    pd.DataFrame(rows).sort_values(["y", "x"]).to_csv(filename, index=False)
 
 
 if __name__ == "__main__":
@@ -115,8 +138,50 @@ if __name__ == "__main__":
     df[is_160m & is_x64 & ~is_tuned_lens & ~is_layer].to_csv(
         "out/test_pythia-160m-deduped_k.csv", index=False
     )
+
     df[is_70m & is_layer].to_csv("out/test_pythia-70m-deduped_layer.csv", index=False)
+    matrix_plot(
+        df[is_70m & is_x64 & is_k32 & ~is_tuned_lens],
+        "out/test_pythia-70m-deduped_layer_fvu.csv",
+        pattern=r"train/fvu/layer_\d+",
+    )
+    matrix_plot(
+        df[is_70m & is_x64 & is_k32 & ~is_tuned_lens],
+        "out/test_pythia-70m-deduped_layer_mse.csv",
+        pattern=r"train/mse/layer_\d+",
+    )
+    matrix_plot(
+        df[is_70m & is_x64 & is_k32 & ~is_tuned_lens],
+        "out/test_pythia-70m-deduped_layer_loss_delta.csv",
+        pattern=r"val/loss/delta/layer_\d+",
+    )
+    matrix_plot(
+        df[is_70m & is_x64 & is_k32 & ~is_tuned_lens],
+        "out/test_pythia-70m-deduped_layer_kl_div.csv",
+        pattern=r"val/logit/kldiv/layer_\d+",
+    )
+
     df[is_160m & is_layer].to_csv("out/test_pythia-160m-deduped_layer.csv", index=False)
+    matrix_plot(
+        df[is_160m & is_x64 & is_k32 & ~is_tuned_lens],
+        "out/test_pythia-160m-deduped_layer_fvu.csv",
+        pattern=r"train/fvu/layer_\d+",
+    )
+    matrix_plot(
+        df[is_160m & is_x64 & is_k32 & ~is_tuned_lens],
+        "out/test_pythia-160m-deduped_layer_mse.csv",
+        pattern=r"train/mse/layer_\d+",
+    )
+    matrix_plot(
+        df[is_160m & is_x64 & is_k32 & ~is_tuned_lens],
+        "out/test_pythia-160m-deduped_layer_loss_delta.csv",
+        pattern=r"val/loss/delta/layer_\d+",
+    )
+    matrix_plot(
+        df[is_160m & is_x64 & is_k32 & ~is_tuned_lens],
+        "out/test_pythia-160m-deduped_layer_kl_div.csv",
+        pattern=r"val/logit/kldiv/layer_\d+",
+    )
 
     df = df[
         [

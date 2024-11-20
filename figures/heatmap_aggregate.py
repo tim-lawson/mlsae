@@ -32,18 +32,39 @@ def get_heatmap_filename(repo_id: str, mode: str) -> str:
 
 
 def main(
+    repo_id: str,
+    mode: str,
+    device: torch.device,
+    out: str | os.PathLike[str] = ".out",
+):
+    norm = None if mode == "probs" else PowerNorm(0.5)
+    dists = Dists.load(repo_id, device)
+    _, indices = dists.layer_mean.sort(descending=True)
+    save_heatmap(
+        get_heatmap_data(dists, mode)[:, indices].cpu(),
+        os.path.join(out, get_heatmap_filename(repo_id, mode)),
+        norm=norm,
+    )
+
+
+def sweep(
     config: Config, device: torch.device, out: str | os.PathLike[str] = ".out"
 ) -> None:
-    norm = None if config.mode == "probs" else PowerNorm(0.5)
     for repo_id in config.repo_ids():
-        dists = Dists.load(repo_id, device)
-        _, indices = dists.layer_mean.sort(descending=True)
-        save_heatmap(
-            get_heatmap_data(dists, config.mode)[:, indices].cpu(),
-            os.path.join(out, get_heatmap_filename(repo_id, config.mode)),
-            norm=norm,
-        )
+        main(repo_id, config.mode, device, out)
 
 
 if __name__ == "__main__":
-    main(parse(Config), get_device())
+    device = get_device()
+    # sweep(parse(Config), device)
+    for repo_id in [
+        "tim-lawson/sae-pythia-70m-deduped-x64-k32-tfm-layers-0-dists",
+        "tim-lawson/sae-pythia-70m-deduped-x64-k32-tfm-layers-1-dists",
+        "tim-lawson/sae-pythia-70m-deduped-x64-k32-tfm-layers-2-dists",
+        "tim-lawson/sae-pythia-70m-deduped-x64-k32-tfm-layers-3-dists",
+        "tim-lawson/sae-pythia-70m-deduped-x64-k32-tfm-layers-4-dists",
+        "tim-lawson/sae-pythia-70m-deduped-x64-k32-tfm-layers-5-dists",
+    ]:
+        main(repo_id, "probs", device)
+        main(repo_id, "counts", device)
+        main(repo_id, "totals", device)

@@ -5,9 +5,9 @@ import pandas as pd
 import torch
 from torch.utils.data import DataLoader
 
-from mlsae.model import DataConfig, MLSAETransformer, TopK, TopKSAE, get_test_dataloader
+from mlsae.model import DataConfig, MLSAETransformer, get_test_dataloader
 from mlsae.trainer import RunConfig, initialize
-from mlsae.utils import get_device, get_repo_id
+from mlsae.utils import forward_single_layer, get_device, get_repo_id, load_single_layer
 
 pythia_70m = "EleutherAI/pythia-70m-deduped"
 pythia_160m = "EleutherAI/pythia-160m-deduped"
@@ -28,28 +28,7 @@ def test(model_name: str, layer: int):
     initialize(config.seed)
     device = get_device()
 
-    # NOTE: This is a hack. We want to feed an SAE trained at layer i with the input
-    # activations from every layer. So, we:
-    #
-    #   1. load the multi-layer SAE + transformer harness
-    model_repo_id = get_repo_id(model_name, 64, 32, False, True)
-    model = MLSAETransformer.from_pretrained(model_repo_id)
-    model = model.to(device)
-
-    #   2. load the layer-specific SAE
-    autoencoder_repo_id = get_repo_id(model_name, 64, 32, False, False, [layer])
-    autoencoder = TopKSAE.from_pretrained(
-        autoencoder_repo_id,
-        # TODO: not sure why these aren't taken from config.json
-        n_inputs=model.n_inputs,
-        n_latents=model.n_latents,
-        k=model.k,
-        dead_steps_threshold=model.dead_steps_threshold,
-    )
-    autoencoder = autoencoder.to(device)
-
-    #   3. replace the autoencoder with the layer-specific one
-    model.autoencoder = autoencoder
+    model = load_single_layer(model_name, layer, device)
 
     dataloader = get_test_dataloader(
         model.model_name,
@@ -75,27 +54,7 @@ def test_manual(
             break
 
         tokens: torch.Tensor = batch["input_ids"].to(device)
-        inputs = model.forward_lens(model.transformer.forward(tokens))
-
-        # NOTE: This is also a hack. We want the input activations to be normalized
-        # independently for each layer. So, we feed them to the SAE one layer at a time
-        # and combine the results.
-        recons = torch.empty(inputs.shape, device=device)
-        topk = TopK(
-            torch.empty(
-                (model.n_layers, model.batch_size, model.max_length, model.k),
-                device=device,
-            ),
-            torch.empty(
-                (model.n_layers, model.batch_size, model.max_length, model.k),
-                device=device,
-            ),
-        )
-        for layer in range(model.n_layers):
-            topk_, recons_, _, _, _ = model.autoencoder.forward(inputs[layer])
-            recons[layer] = recons_
-            topk.indices[layer] = topk_.indices
-            topk.values[layer] = topk_.values
+        inputs, recons, topk = forward_single_layer(model, tokens)
 
         model.train_metrics.forward(
             inputs=inputs,
