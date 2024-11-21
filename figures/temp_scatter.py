@@ -16,7 +16,7 @@ def main(
     os.makedirs(out, exist_ok=True)
     figsize, dpi = (6, 6), 300
 
-    for repo_id in config.repo_ids():
+    for repo_id in config.repo_ids(tuned_lens=config.tuned_lens):
         model_name = repo_id.split("/")[-1]
         dists = Dists.load(repo_id, device)
 

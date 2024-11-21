@@ -37,7 +37,7 @@ def main(
     config: Config, device: torch.device, out: str | os.PathLike[str] = ".out"
 ) -> None:
     os.makedirs(out, exist_ok=True)
-    for repo_id in config.repo_ids():
+    for repo_id in config.repo_ids(tuned_lens=config.tuned_lens):
         dists = Dists.load(repo_id, device)
 
         data = get_data(dists, config.mode) / 1e7  # n_tokens

@@ -21,7 +21,7 @@ def main(
     config: Config, device: torch.device, out: str | os.PathLike[str] = ".out"
 ) -> None:
     os.makedirs(out, exist_ok=True)
-    for repo_id in config.repo_ids():
+    for repo_id in config.repo_ids(transformer=True, tuned_lens=config.tuned_lens):
         dists = Dists.load(repo_id, device)
         values = dists.layer_mean[~torch.isnan(dists.layer_mean)].cpu().numpy()
 

@@ -79,7 +79,7 @@ def main(
     config: SweepConfig, device: torch.device, out: str | os.PathLike[str] = ".out"
 ) -> None:
     os.makedirs(out, exist_ok=True)
-    for repo_id in config.repo_ids(transformer=True):
+    for repo_id in config.repo_ids(transformer=True, tuned_lens=config.tuned_lens):
         mlsae = MLSAETransformer.from_pretrained(repo_id).to(device).autoencoder
 
         Wdec_real = normalize(mlsae.decoder.weight.detach())

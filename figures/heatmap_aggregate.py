@@ -16,6 +16,8 @@ class Config(SweepConfig):
     mode: str = "probs"
     """Whether to plot counts, totals, or probabilities."""
 
+    gamma: float = 0.5
+
 
 def get_heatmap_data(dists: Dists, mode: str) -> torch.Tensor:
     if mode == "counts":
@@ -33,17 +35,17 @@ def get_heatmap_filename(repo_id: str, mode: str) -> str:
 
 def main(
     repo_id: str,
-    mode: str,
+    config: Config,
     device: torch.device,
     out: str | os.PathLike[str] = ".out",
 ):
     os.makedirs(out, exist_ok=True)
-    norm = None if mode == "probs" else PowerNorm(0.5)
+    norm = None if config.mode == "probs" else PowerNorm(config.gamma)
     dists = Dists.load(repo_id, device)
     _, indices = dists.layer_mean.sort(descending=True)
     save_heatmap(
-        get_heatmap_data(dists, mode)[:, indices].cpu(),
-        os.path.join(out, get_heatmap_filename(repo_id, mode)),
+        get_heatmap_data(dists, config.mode)[:, indices].cpu(),
+        os.path.join(out, get_heatmap_filename(repo_id, config.mode)),
         norm=norm,
     )
 
@@ -52,34 +54,8 @@ def sweep(
     config: Config, device: torch.device, out: str | os.PathLike[str] = ".out"
 ) -> None:
     os.makedirs(out, exist_ok=True)
-    for repo_id in config.repo_ids():
-        main(repo_id, config.mode, device, out)
-
-
-def sweep_layers() -> None:
-    for repo_id in [
-        "tim-lawson/sae-pythia-70m-deduped-x64-k32-tfm-layers-0-dists",
-        "tim-lawson/sae-pythia-70m-deduped-x64-k32-tfm-layers-1-dists",
-        "tim-lawson/sae-pythia-70m-deduped-x64-k32-tfm-layers-2-dists",
-        "tim-lawson/sae-pythia-70m-deduped-x64-k32-tfm-layers-3-dists",
-        "tim-lawson/sae-pythia-70m-deduped-x64-k32-tfm-layers-4-dists",
-        "tim-lawson/sae-pythia-70m-deduped-x64-k32-tfm-layers-5-dists",
-        "tim-lawson/sae-pythia-160m-deduped-x64-k32-tfm-layers-0-dists",
-        "tim-lawson/sae-pythia-160m-deduped-x64-k32-tfm-layers-1-dists",
-        "tim-lawson/sae-pythia-160m-deduped-x64-k32-tfm-layers-2-dists",
-        "tim-lawson/sae-pythia-160m-deduped-x64-k32-tfm-layers-3-dists",
-        "tim-lawson/sae-pythia-160m-deduped-x64-k32-tfm-layers-4-dists",
-        "tim-lawson/sae-pythia-160m-deduped-x64-k32-tfm-layers-5-dists",
-        "tim-lawson/sae-pythia-160m-deduped-x64-k32-tfm-layers-6-dists",
-        "tim-lawson/sae-pythia-160m-deduped-x64-k32-tfm-layers-7-dists",
-        "tim-lawson/sae-pythia-160m-deduped-x64-k32-tfm-layers-8-dists",
-        "tim-lawson/sae-pythia-160m-deduped-x64-k32-tfm-layers-9-dists",
-        "tim-lawson/sae-pythia-160m-deduped-x64-k32-tfm-layers-10-dists",
-        "tim-lawson/sae-pythia-160m-deduped-x64-k32-tfm-layers-11-dists",
-    ]:
-        main(repo_id, "probs", device)
-        main(repo_id, "counts", device)
-        main(repo_id, "totals", device)
+    for repo_id in config.repo_ids(transformer=True, tuned_lens=config.tuned_lens):
+        main(repo_id, config, device, out)
 
 
 if __name__ == "__main__":

@@ -23,6 +23,8 @@ class Config(SweepConfig):
     mode: str = "probs"
     """Whether to plot counts, totals, or probabilities."""
 
+    gamma: float = 0.5
+
 
 @torch.no_grad()
 def get_heatmap_data(
@@ -48,7 +50,7 @@ def get_heatmap_data(
     latents = scatter_topk(topk, model.n_latents).squeeze()
 
     if config.mode == "counts":
-        data = latents.gt(config.dead_threshold).float().sum(dim=1)
+        data = latents.where(latents.gt(config.dead_threshold), 0).float().sum(dim=1)
     elif config.mode == "totals":
         data = latents.sum(dim=1)
     elif config.mode == "probs":
@@ -56,6 +58,9 @@ def get_heatmap_data(
         data = latents / latents.sum(dim=0, keepdim=True)
     else:
         raise ValueError(f"Invalid mode: {config.mode}")
+
+    # Exclude latents that never activate
+    data = data[:, torch.any(data.gt(0), dim=0)]
 
     layers = torch.arange(0, model.n_layers, device=device).unsqueeze(-1)
     _, indices = (data * layers).sum(0).sort(descending=True)
@@ -67,12 +72,12 @@ def get_heatmap_filename(repo_id: str, mode: str) -> str:
     return f"heatmap_prompt_{mode}_{repo_id.split('/')[-1]}.pdf"
 
 
-def main(
+def sweep(
     config: Config, device: torch.device | str, out: str | os.PathLike[str] = ".out"
 ) -> None:
     os.makedirs(out, exist_ok=True)
-    norm = None if config.mode == "probs" else PowerNorm(0.5)
-    for repo_id in config.repo_ids():
+    norm = None if config.mode == "probs" else PowerNorm(config.gamma)
+    for repo_id in config.repo_ids(transformer=True, tuned_lens=config.tuned_lens):
         save_heatmap(
             get_heatmap_data(config, repo_id, device).cpu(),
             os.path.join(out, get_heatmap_filename(repo_id, config.mode)),
@@ -81,4 +86,4 @@ def main(
 
 
 if __name__ == "__main__":
-    main(parse(Config), get_device())
+    sweep(parse(Config), get_device())

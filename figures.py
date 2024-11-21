@@ -48,13 +48,13 @@ class FigureConfig(Serializable):
     mmcs: bool = False
     wdec_sim: bool = False
     num_layers: bool = False
+    entropy: bool = False
 
     embed_sim: bool = False
     layer_std: bool = False
     layer_hist: bool = False
     layer_sim: bool = False
     heatmap_freq: bool = False
-    entropy: bool = False
 
 
 def main(config: FigureConfig, sweeps: list[FigureSweep]) -> None:
@@ -70,10 +70,12 @@ def main(config: FigureConfig, sweeps: list[FigureSweep]) -> None:
         sweep_dict = sweep.__dict__
 
         for mode in ["probs", "counts", "totals"]:
+            gamma = 0.25
+
             if config.heatmap_aggregate:
                 print(f"> heatmap_aggregate ({mode})")
                 heatmap_aggregate_config = heatmap_aggregate.Config(
-                    **sweep_dict, mode=mode
+                    **sweep_dict, mode=mode, gamma=gamma
                 )
                 heatmap_aggregate.sweep(
                     heatmap_aggregate_config,
@@ -83,8 +85,10 @@ def main(config: FigureConfig, sweeps: list[FigureSweep]) -> None:
 
             if config.heatmap_prompt:
                 print(f"> heatmap_prompt ({mode})")
-                heatmap_prompt_config = heatmap_prompt.Config(**sweep_dict, mode=mode)
-                heatmap_prompt.main(
+                heatmap_prompt_config = heatmap_prompt.Config(
+                    **sweep_dict, mode=mode, gamma=gamma
+                )
+                heatmap_prompt.sweep(
                     heatmap_prompt_config,
                     device,
                     os.path.join(config.out, f"heatmap_prompt_{mode}"),
