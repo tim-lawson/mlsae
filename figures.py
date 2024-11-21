@@ -108,6 +108,11 @@ def main(config: FigureConfig, sweeps: list[FigureSweep]) -> None:
                 num_layers_config, device, os.path.join(config.out, "num_layers")
             )
 
+        if config.entropy:
+            print("> entropy")
+            entropy_config = entropy.Config(**sweep_dict, filename=f"entropy_{id}.csv")
+            entropy.main(entropy_config, device, os.path.join(config.out, "entropy"))
+
         if config.embed_sim:
             print("> embed_sim")
             embed_sim_config = embed_sim.Config(
@@ -140,10 +145,6 @@ def main(config: FigureConfig, sweeps: list[FigureSweep]) -> None:
         if config.heatmap_freq:
             print("> heatmap_freq")
             temp_scatter.main(sweep, device, os.path.join(config.out, "heatmap_freq"))
-
-        if config.entropy:
-            print("> entropy")
-            entropy.main(sweep, device, os.path.join(config.out, "entropy"))
 
 
 sweeps: list[FigureSweep] = [
