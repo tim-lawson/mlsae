@@ -6,7 +6,7 @@ import torch
 from simple_parsing import parse
 
 from mlsae.analysis.dists import Dists, get_stats
-from mlsae.trainer import SweepConfig, initialize
+from mlsae.trainer import SweepConfig
 from mlsae.utils import get_device, get_repo_id
 
 
@@ -19,7 +19,7 @@ class Config(SweepConfig):
 def main(
     config: Config, device: torch.device, out: str | os.PathLike[str] = ".out"
 ) -> None:
-    initialize(config.seed)
+    os.makedirs(out, exist_ok=True)
     rows: list[dict[str, str | int | float]] = []
     for model_name, expansion_factor, k in config:
         repo_id = get_repo_id(

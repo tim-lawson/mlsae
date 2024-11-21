@@ -1,6 +1,8 @@
 import os
 from dataclasses import dataclass
 
+from simple_parsing import Serializable, parse
+
 from figures import (
     embed_sim,
     entropy,
@@ -10,7 +12,9 @@ from figures import (
     layer_sim,
     layer_std,
     mmcs,
+    num_layers,
     temp_scatter,
+    wdec_sim,
 )
 from mlsae.trainer import SweepConfig
 from mlsae.utils import get_device
@@ -30,18 +34,20 @@ class FigureSweep(SweepConfig):
     id: str | None = None
     """The identifier to use for filenames."""
 
-    enabled: bool = False
+    enabled: bool = True
     """Whether to enable this sweep."""
 
 
 @dataclass
-class FigureConfig:
-    out: str
+class FigureConfig(Serializable):
+    out: str = ".out"
     """The directory to save the results to."""
 
-    heatmap_aggregate: bool = True
-    heatmap_prompt: bool = True
-    mmcs: bool = True
+    heatmap_aggregate: bool = False
+    heatmap_prompt: bool = False
+    mmcs: bool = False
+    wdec_sim: bool = False
+    num_layers: bool = False
 
     embed_sim: bool = False
     layer_std: bool = False
@@ -51,57 +57,93 @@ class FigureConfig:
     entropy: bool = False
 
 
-def main(sweeps: list[FigureSweep]) -> None:
+def main(config: FigureConfig, sweeps: list[FigureSweep]) -> None:
     device = get_device()
-    config = FigureConfig(out=".out")
     os.makedirs(config.out, exist_ok=True)
 
     for sweep in sweeps:
-        if not sweep.enabled:
+        id = sweep.__dict__.pop("id")
+        print(id)
+        enabled = sweep.__dict__.pop("enabled")
+        if not enabled:
             continue
-        _ = sweep.__dict__.pop("id")
-        _ = sweep.__dict__.pop("enabled")
         sweep_dict = sweep.__dict__
 
         for mode in ["probs", "counts", "totals"]:
             if config.heatmap_aggregate:
+                print(f"> heatmap_aggregate ({mode})")
                 heatmap_aggregate_config = heatmap_aggregate.Config(
                     **sweep_dict, mode=mode
                 )
-                heatmap_aggregate.sweep(heatmap_aggregate_config, device, config.out)
+                heatmap_aggregate.sweep(
+                    heatmap_aggregate_config,
+                    device,
+                    os.path.join(config.out, f"heatmap_aggregate_{mode}"),
+                )
 
             if config.heatmap_prompt:
+                print(f"> heatmap_prompt ({mode})")
                 heatmap_prompt_config = heatmap_prompt.Config(**sweep_dict, mode=mode)
-                heatmap_prompt.main(heatmap_prompt_config, device, config.out)
+                heatmap_prompt.main(
+                    heatmap_prompt_config,
+                    device,
+                    os.path.join(config.out, f"heatmap_prompt_{mode}"),
+                )
 
         if config.mmcs:
-            mmcs_config = mmcs.Config(**sweep_dict, filename=f"mmcs_{sweep.id}.csv")
-            mmcs.main(mmcs_config, device, config.out)
+            print("> mmcs")
+            mmcs_config = mmcs.Config(**sweep_dict, filename=f"mmcs_{id}.csv")
+            mmcs.main(mmcs_config, device, os.path.join(config.out, "mmcs"))
+
+        if config.wdec_sim:
+            print("> wdec_sim")
+            wdec_sim.main(sweep, device, os.path.join(config.out, "wdec_sim"))
+
+        if config.num_layers:
+            print("> num_layers")
+            num_layers_config = num_layers.Config(
+                **sweep_dict, filename=f"num_layers_{id}.csv"
+            )
+            num_layers.main(
+                num_layers_config, device, os.path.join(config.out, "num_layers")
+            )
 
         if config.embed_sim:
+            print("> embed_sim")
             embed_sim_config = embed_sim.Config(
-                **sweep_dict, filename=f"embed_sim_{sweep.id}.csv"
+                **sweep_dict, filename=f"embed_sim_{id}.csv"
             )
-            embed_sim.main(embed_sim_config, device, config.out)
+            embed_sim.main(
+                embed_sim_config, device, os.path.join(config.out, "embed_sim")
+            )
 
         if config.layer_std:
+            print("> layer_std")
             layer_std_config = layer_std.Config(
-                **sweep_dict, filename=f"layer_std_{sweep.id}.csv"
+                **sweep_dict, filename=f"layer_std_{id}.csv"
             )
-            layer_std.main(layer_std_config, device, config.out)
+            layer_std.main(
+                layer_std_config, device, os.path.join(config.out, "layer_std")
+            )
 
         if config.layer_hist:
+            print("> layer_hist")
             layer_hist_config = layer_hist.Config(**sweep_dict)
-            layer_hist.main(layer_hist_config, device, config.out)
+            layer_hist.main(
+                layer_hist_config, device, os.path.join(config.out, "layer_hist")
+            )
 
         if config.layer_sim:
-            layer_sim.main(sweep, device, config.out)
+            print("> layer_sim")
+            layer_sim.main(sweep, device, os.path.join(config.out, "layer_sim"))
 
         if config.heatmap_freq:
-            temp_scatter.main(sweep, device, config.out)
+            print("> heatmap_freq")
+            temp_scatter.main(sweep, device, os.path.join(config.out, "heatmap_freq"))
 
         if config.entropy:
-            entropy.main(sweep, device, config.out)
+            print("> entropy")
+            entropy.main(sweep, device, os.path.join(config.out, "entropy"))
 
 
 sweeps: list[FigureSweep] = [
@@ -181,4 +223,4 @@ sweeps: list[FigureSweep] = [
 ]
 
 if __name__ == "__main__":
-    main(sweeps)
+    main(parse(FigureConfig), sweeps)

@@ -78,6 +78,7 @@ def get_wdec_sims(
 def main(
     config: SweepConfig, device: torch.device, out: str | os.PathLike[str] = ".out"
 ) -> None:
+    os.makedirs(out, exist_ok=True)
     for repo_id in config.repo_ids(transformer=True):
         mlsae = MLSAETransformer.from_pretrained(repo_id).to(device).autoencoder
 
@@ -87,9 +88,9 @@ def main(
         values_real = get_pairwise_sims(Wdec_real).cpu().numpy()
         values_fake = get_pairwise_sims(Wdec_fake).cpu().numpy()
 
-        hist_real, bins = np.histogram(values_real, bins=100, range=(-1, 1))
+        hist_real, bins = np.histogram(values_real, bins=200, range=(-1, 1))
         hist_real = np.append(hist_real, 0)
-        hist_fake, _ = np.histogram(values_fake, bins=100, range=(-1, 1))
+        hist_fake, _ = np.histogram(values_fake, bins=200, range=(-1, 1))
         hist_fake = np.append(hist_fake, 0)
 
         pd.DataFrame({"bin": bins, "real": hist_real, "fake": hist_fake}).to_csv(

@@ -9,7 +9,7 @@ from simple_parsing import field, parse
 from transformers import AutoTokenizer, GPTNeoXForCausalLM
 
 from mlsae.model import MLSAETransformer
-from mlsae.trainer.config import SweepConfig, initialize
+from mlsae.trainer.config import SweepConfig
 from mlsae.utils import get_device, get_repo_id, normalize
 
 
@@ -70,7 +70,7 @@ def get_similar_embeds(
 def main(
     config: Config, device: torch.device, out: str | os.PathLike[str] = ".out"
 ) -> None:
-    initialize(config.seed)
+    os.makedirs(out, exist_ok=True)
     rows: list[dict[str, str | int | float]] = []
     for model_name, expansion_factor, k in config:
         repo_id = get_repo_id(

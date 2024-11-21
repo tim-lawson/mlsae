@@ -13,6 +13,7 @@ from mlsae.utils import get_device
 def main(
     config: SweepConfig, device: torch.device, out: str | os.PathLike[str] = ".out"
 ) -> None:
+    os.makedirs(out, exist_ok=True)
     figsize, dpi = (6, 6), 300
 
     for repo_id in config.repo_ids():

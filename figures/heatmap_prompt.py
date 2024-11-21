@@ -70,6 +70,7 @@ def get_heatmap_filename(repo_id: str, mode: str) -> str:
 def main(
     config: Config, device: torch.device | str, out: str | os.PathLike[str] = ".out"
 ) -> None:
+    os.makedirs(out, exist_ok=True)
     norm = None if config.mode == "probs" else PowerNorm(0.5)
     for repo_id in config.repo_ids():
         save_heatmap(

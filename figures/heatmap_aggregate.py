@@ -37,6 +37,7 @@ def main(
     device: torch.device,
     out: str | os.PathLike[str] = ".out",
 ):
+    os.makedirs(out, exist_ok=True)
     norm = None if mode == "probs" else PowerNorm(0.5)
     dists = Dists.load(repo_id, device)
     _, indices = dists.layer_mean.sort(descending=True)
@@ -50,6 +51,7 @@ def main(
 def sweep(
     config: Config, device: torch.device, out: str | os.PathLike[str] = ".out"
 ) -> None:
+    os.makedirs(out, exist_ok=True)
     for repo_id in config.repo_ids():
         main(repo_id, config.mode, device, out)
 

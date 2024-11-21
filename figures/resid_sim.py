@@ -36,7 +36,10 @@ class VarianceMetric:
 
 
 @torch.no_grad()
-def main(config: RunConfig, device: torch.device) -> None:
+def main(
+    config: RunConfig, device: torch.device, out: str | os.PathLike[str] = ".out"
+) -> None:
+    os.makedirs(out, exist_ok=True)
     initialize(config.seed)
 
     transformer = PythiaTransformer(
@@ -126,7 +129,7 @@ def main(config: RunConfig, device: torch.device) -> None:
 
     df = pd.DataFrame(data)
     df.index.name = "start_at_layer"
-    df.to_csv(os.path.join("out", f"resid_cos_sim_{lens_name}{model_name}.csv"))
+    df.to_csv(os.path.join(out, f"resid_cos_sim_{lens_name}{model_name}.csv"))
 
 
 if __name__ == "__main__":

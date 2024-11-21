@@ -57,6 +57,7 @@ def save_heatmap(
 def main(
     config: SweepConfig, device: torch.device, out: str | os.PathLike[str] = ".out"
 ) -> None:
+    os.makedirs(out, exist_ok=True)
     for repo_id in config.repo_ids(transformer=False):
         filename = f"layer_sim_{repo_id.split('/')[-1]}.pdf"
         x, y = get_heatmap_data(repo_id, device)

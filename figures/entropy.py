@@ -14,6 +14,7 @@ from mlsae.utils import get_device
 def main(
     config: SweepConfig, device: torch.device, out: str | os.PathLike[str] = ".out"
 ) -> None:
+    os.makedirs(out, exist_ok=True)
     for repo_id in config.repo_ids():
         filename = f"entropy_{repo_id.split("/")[-1]}.csv"
 

@@ -36,6 +36,7 @@ def get_pdf(repo_id: str, mode: str) -> str:
 def main(
     config: Config, device: torch.device, out: str | os.PathLike[str] = ".out"
 ) -> None:
+    os.makedirs(out, exist_ok=True)
     for repo_id in config.repo_ids():
         dists = Dists.load(repo_id, device)
 
