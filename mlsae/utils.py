@@ -113,11 +113,15 @@ def load_single_layer(
 
 # NOTE: This is also a hack. We want the input activations to be normalized
 # independently for each layer. So, we feed them to the SAE one layer at a time
-# and combine the results.
+# and combine the results. UPDATE: Turns out, this is equivalent to the forward method.
 def forward_single_layer(
     model: MLSAETransformer, tokens: torch.Tensor
 ) -> tuple[torch.Tensor, torch.Tensor, TopK]:
     inputs = model.forward_lens(model.transformer.forward(tokens))
+
+    topk, recons, _, _, _ = model.forward(tokens)
+    return inputs, recons, topk
+
     recons = torch.empty(inputs.shape, device=model.device)
     topk = TopK(
         values=torch.empty(
