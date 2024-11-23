@@ -4,6 +4,7 @@ from pprint import pprint
 import pandas as pd
 import torch
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 from mlsae.model import DataConfig, MLSAETransformer, get_test_dataloader
 from mlsae.trainer import RunConfig, initialize
@@ -21,7 +22,7 @@ layers = {
     # pythia_1b: range(16),
 }
 
-config = RunConfig(data=DataConfig(max_tokens=10_000_000))
+config = RunConfig(data=DataConfig(max_tokens=1_000_000))
 
 
 def test(model_name: str, layer: int):
@@ -49,6 +50,16 @@ def test(model_name: str, layer: int):
 def test_manual(
     model: MLSAETransformer, dataloader: DataLoader[torch.Tensor], device: torch.device
 ) -> dict[str, torch.Tensor]:
+    def compute() -> dict[str, torch.Tensor]:
+        return {
+            **model.train_metrics.compute(),
+            **model.val_metrics.compute(),
+            "loss/mse": model.mse_loss.compute(),
+            "loss/auxk": model.aux_loss.compute(),
+            "loss/total": model.mse_loss.compute() + model.aux_loss.compute(),
+        }
+
+    pbar = tqdm(total=config.data.max_steps)
     for i, batch in enumerate(dataloader):
         if i >= config.data.max_steps:
             break
@@ -72,24 +83,25 @@ def test_manual(
             logits_true=model.logits_true,
             logits_pred=model.logits_pred,
         )
+
         model.mse_loss.forward(inputs=inputs, recons=recons)
 
-    return {
-        **model.train_metrics.compute(),
-        **model.val_metrics.compute(),
-        "loss/mse": model.mse_loss.compute(),
-        "loss/auxk": model.aux_loss.compute(),
-        "loss/total": model.mse_loss.compute() + model.aux_loss.compute(),
-    }
+        pbar.write(str(compute()))
+        pbar.update(1)
+
+    return compute()
 
 
 def main() -> None:
+    def fn(model_name: str, layer: int):
+        try:
+            test(model_name, layer)
+        except Exception as e:
+            print(e)
+
     for model_name in [pythia_70m, pythia_160m]:
         for layer in layers[model_name]:
-            try:
-                test(model_name, layer)
-            except Exception as e:
-                print(e)
+            fn(model_name, layer)
 
 
 if __name__ == "__main__":

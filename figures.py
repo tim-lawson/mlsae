@@ -105,8 +105,11 @@ def main(config: FigureConfig, sweeps: list[FigureSweep]) -> None:
 
         if config.num_layers:
             print("> num_layers")
+            threshold = 1000000
             num_layers_config = num_layers.Config(
-                **sweep_dict, filename=f"num_layers_{id}.csv"
+                **sweep_dict,
+                filename=f"num_layers_{id}_{threshold}.csv",
+                threshold=threshold,
             )
             num_layers.main(
                 num_layers_config, device, os.path.join(config.out, "num_layers")

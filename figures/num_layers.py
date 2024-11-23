@@ -55,7 +55,8 @@ def main(
         )
         hist = np.append(hist, 0)
         pd.DataFrame({"bins": bins, "hist": hist}).to_csv(
-            os.path.join(out, f"num_layers_{repo_id}.csv"), index=False
+            os.path.join(out, f"num_layers_{repo_id}_{config.threshold}.csv"),
+            index=False,
         )
 
     pd.DataFrame(rows).to_csv(os.path.join(out, config.filename), index=False)
