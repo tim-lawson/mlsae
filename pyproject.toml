@@ -7,6 +7,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "datasets>=3.1.0",
+    "diptest>=0.8.2",
     "einops>=0.8.0",
     "fastapi>=0.115.5",
     "huggingface-hub[cli]>=0.26.2",
@@ -22,6 +23,7 @@ dependencies = [
     "pytest>=8.3.3",
     "ruff>=0.7.3",
     "safetensors>=0.4.5",
+    "scipy>=1.14.1",
     "simple-parsing>=0.1.6",
     "torch>=2.5.1",
     "torchmetrics>=1.6.0",

@@ -91,12 +91,15 @@ def load_single_layer(
     # activations from every layer. So, we:
     #   1. Load the multi-layer SAE and underlying transformer
     model_repo_id = get_repo_id(model_name, expansion_factor, k, tuned_lens, True)
+    print("model repo_id:", model_repo_id)
     model = MLSAETransformer.from_pretrained(model_repo_id)
     model = model.to(device)
+
     #   2. Load the layer-specific SAE only
     autoencoder_repo_id = get_repo_id(
         model_name, expansion_factor, k, tuned_lens, False, [layer]
     )
+    print("autoencoder repo_id:", autoencoder_repo_id)
     autoencoder = TopKSAE.from_pretrained(
         autoencoder_repo_id,
         # TODO: These should be taken from config.json
@@ -106,8 +109,20 @@ def load_single_layer(
         dead_steps_threshold=model.dead_steps_threshold,
     )
     autoencoder = autoencoder.to(device)
+
     #   3. Replace the SAE in the multi-layer model with the layer-specific one
     model.autoencoder = autoencoder
+
+    # Optional: check the hyperparameters match
+    assert model.n_inputs == autoencoder.n_inputs
+    assert model.n_latents == autoencoder.n_latents
+    assert model.k == autoencoder.k
+    assert model.dead_steps_threshold == autoencoder.dead_steps_threshold
+    assert model.dead_threshold == autoencoder.dead_threshold
+    assert model.auxk == autoencoder.auxk
+
+    model.standardize = model.autoencoder.standardize
+
     return model
 
 
@@ -117,10 +132,11 @@ def load_single_layer(
 def forward_single_layer(
     model: MLSAETransformer, tokens: torch.Tensor
 ) -> tuple[torch.Tensor, torch.Tensor, TopK]:
+    standardize = model.autoencoder.standardize
     inputs = model.forward_lens(model.transformer.forward(tokens))
 
-    topk, recons, _, _, _ = model.forward(tokens)
-    return inputs, recons, topk
+    # topk, recons, _, _, _ = model.forward(tokens)
+    # return inputs, recons, topk
 
     recons = torch.empty(inputs.shape, device=model.device)
     topk = TopK(
@@ -135,8 +151,12 @@ def forward_single_layer(
         ),
     )
     for layer in range(model.n_layers):
+        model.autoencoder.standardize = True
+        if layer == model.n_layers - 1:
+            model.autoencoder.standardize = False
         topk_, recons_, _, _, _ = model.autoencoder.forward(inputs[layer])
         recons[layer] = recons_
         topk.indices[layer] = topk_.indices
         topk.values[layer] = topk_.values
+    model.autoencoder.standardize = standardize
     return inputs, recons, topk

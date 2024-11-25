@@ -29,7 +29,7 @@ def parse_sae_repo_id(repo_id: str) -> tuple[str, int, int, bool, int]:
     expansion_factor = int(split[4].lstrip("x"))
     k = int(split[5].lstrip("k"))
     tuned_lens = "-lens" in repo_id
-    layer = int(split[8].rstrip(".csv"))
+    layer = int(split[9].rstrip(".csv")) if tuned_lens else int(split[8].rstrip(".csv"))
     return model_name, expansion_factor, k, tuned_lens, layer
 
 
@@ -146,7 +146,9 @@ if __name__ == "__main__":
         "out/test_pythia-160m-deduped_k.csv", index=False
     )
 
-    df[is_70m & is_layer].to_csv("out/test_pythia-70m-deduped_layer.csv", index=False)
+    df[is_70m & is_layer & ~is_tuned_lens].to_csv(
+        "out/test_pythia-70m-deduped_layer.csv", index=False
+    )
     matrix_plot(
         df[is_70m & is_x64 & is_k32 & ~is_tuned_lens],
         "out/test_pythia-70m-deduped_layer_fvu.csv",
@@ -168,7 +170,33 @@ if __name__ == "__main__":
         pattern=r"val/logit/kldiv/layer_\d+",
     )
 
-    df[is_160m & is_layer].to_csv("out/test_pythia-160m-deduped_layer.csv", index=False)
+    df[is_70m & is_layer & is_tuned_lens].to_csv(
+        "out/test_pythia-70m-deduped_layer.csv", index=False
+    )
+    matrix_plot(
+        df[is_70m & is_x64 & is_k32 & is_tuned_lens],
+        "out/test_pythia-70m-deduped_lens_layer_fvu.csv",
+        pattern=r"train/fvu/layer_\d+",
+    )
+    matrix_plot(
+        df[is_70m & is_x64 & is_k32 & is_tuned_lens],
+        "out/test_pythia-70m-deduped_lens_layer_mse.csv",
+        pattern=r"train/mse/layer_\d+",
+    )
+    matrix_plot(
+        df[is_70m & is_x64 & is_k32 & is_tuned_lens],
+        "out/test_pythia-70m-deduped_lens_layer_loss_delta.csv",
+        pattern=r"val/loss/delta/layer_\d+",
+    )
+    matrix_plot(
+        df[is_70m & is_x64 & is_k32 & is_tuned_lens],
+        "out/test_pythia-70m-deduped_lens_layer_kl_div.csv",
+        pattern=r"val/logit/kldiv/layer_\d+",
+    )
+
+    df[is_160m & is_layer & ~is_tuned_lens].to_csv(
+        "out/test_pythia-160m-deduped_layer.csv", index=False
+    )
     matrix_plot(
         df[is_160m & is_x64 & is_k32 & ~is_tuned_lens],
         "out/test_pythia-160m-deduped_layer_fvu.csv",

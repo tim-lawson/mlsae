@@ -8,7 +8,13 @@ from tqdm import tqdm
 
 from mlsae.model import DataConfig, MLSAETransformer, get_test_dataloader
 from mlsae.trainer import RunConfig, initialize
-from mlsae.utils import forward_single_layer, get_device, get_repo_id, load_single_layer
+from mlsae.utils import (
+    forward_single_layer,
+    get_device,
+    get_model_repo_id,
+    get_repo_id,
+    load_single_layer,
+)
 
 pythia_70m = "EleutherAI/pythia-70m-deduped"
 pythia_160m = "EleutherAI/pythia-160m-deduped"
@@ -25,11 +31,12 @@ layers = {
 config = RunConfig(data=DataConfig(max_tokens=1_000_000))
 
 
-def test(model_name: str, layer: int):
+def test(model_name: str, layer: int, tuned_lens: bool):
     initialize(config.seed)
     device = get_device()
 
     model = load_single_layer(model_name, layer, device)
+    print(f"standardize: {model.autoencoder.standardize}/{model.standardize}")
 
     dataloader = get_test_dataloader(
         model.model_name,
@@ -42,7 +49,7 @@ def test(model_name: str, layer: int):
     output = {k: v.item() for k, v in output.items()}
     pprint(output)
 
-    filename_repo_id = get_repo_id(model_name, 64, 32, False, True, [layer])
+    filename_repo_id = get_repo_id(model_name, 64, 32, tuned_lens, True, [layer])
     filename = f"test_{filename_repo_id.split('/')[-1]}.csv"
     pd.DataFrame(output, index=[0]).to_csv(os.path.join("out", filename), index=False)
 
@@ -86,22 +93,28 @@ def test_manual(
 
         model.mse_loss.forward(inputs=inputs, recons=recons)
 
-        pbar.write(str(compute()))
+        # pbar.write(str(compute()))
         pbar.update(1)
 
     return compute()
 
 
 def main() -> None:
-    def fn(model_name: str, layer: int):
-        try:
-            test(model_name, layer)
-        except Exception as e:
-            print(e)
+    for model_name, layer, tuned_lens in [
+        (pythia_70m, 5, False),
+        (pythia_160m, 11, False),
+        (pythia_70m, 0, True),
+        (pythia_70m, 1, True),
+        (pythia_70m, 2, True),
+        (pythia_70m, 3, True),
+        (pythia_70m, 4, True),
+        (pythia_70m, 5, True),
+    ]:
+        test(model_name, layer, tuned_lens)
 
-    for model_name in [pythia_70m, pythia_160m]:
-        for layer in layers[model_name]:
-            fn(model_name, layer)
+    # for model_name in [pythia_70m, pythia_160m]:
+    #     for layer in layers[model_name]:
+    #         test(model_name, layer)
 
 
 if __name__ == "__main__":

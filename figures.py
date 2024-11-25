@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from simple_parsing import Serializable, parse
 
 from figures import (
+    bimodality,
     embed_sim,
     entropy,
     heatmap_aggregate,
@@ -49,6 +50,7 @@ class FigureConfig(Serializable):
     wdec_sim: bool = False
     num_layers: bool = False
     entropy: bool = False
+    bimodality: bool = False
 
     embed_sim: bool = False
     layer_std: bool = False
@@ -119,6 +121,15 @@ def main(config: FigureConfig, sweeps: list[FigureSweep]) -> None:
             print("> entropy")
             entropy_config = entropy.Config(**sweep_dict, filename=f"entropy_{id}.csv")
             entropy.main(entropy_config, device, os.path.join(config.out, "entropy"))
+
+        if config.bimodality:
+            print("> bimodality")
+            bimodality_config = bimodality.Config(
+                **sweep_dict, filename=f"bimodality_{id}.csv"
+            )
+            bimodality.main(
+                bimodality_config, device, os.path.join(config.out, "bimodality")
+            )
 
         if config.embed_sim:
             print("> embed_sim")

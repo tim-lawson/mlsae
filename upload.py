@@ -1,9 +1,9 @@
 import os
 
-from loguru import logger
-
 from mlsae.model import MLSAETransformer
 from mlsae.utils import get_model_repo_id
+
+dry_run = False
 
 
 def find_ckpt_paths(
@@ -18,7 +18,7 @@ def find_ckpt_paths(
 
 
 def upload_models(ckpt_path: str) -> None:
-    logger.info(f"loading from: {ckpt_path}")
+    print(f"loading from: {ckpt_path}")
     model = MLSAETransformer.load_from_checkpoint(ckpt_path)
 
     # Remove the buffers, if we haven't already. This saves A LOT of space!
@@ -35,22 +35,37 @@ def upload_models(ckpt_path: str) -> None:
 
     # The PyTorch Lightning module, which includes the underlying transformer.
     repo_id_tfm = get_model_repo_id(model, True)
+    print("repo_id (transformer):", repo_id_tfm)
     save_dir_tfm = f"models/{repo_id_tfm}"
-    os.makedirs(save_dir_tfm, exist_ok=True)
-    model.save_pretrained(
-        save_directory=save_dir_tfm, repo_id=repo_id_tfm, push_to_hub=True
-    )
+
+    if not dry_run:
+        os.makedirs(save_dir_tfm, exist_ok=True)
+        model.save_pretrained(
+            save_directory=save_dir_tfm, repo_id=repo_id_tfm, push_to_hub=True
+        )
 
     # The PyTorch autoencoder module, which is much smaller.
     repo_id = get_model_repo_id(model, False)
+    print("repo_id (autoencoder):", repo_id)
     save_dir = f"models/{repo_id}"
-    os.makedirs(save_dir, exist_ok=True)
-    model.autoencoder.save_pretrained(
-        save_directory=save_dir, repo_id=repo_id, push_to_hub=True
-    )
+
+    if not dry_run:
+        os.makedirs(save_dir, exist_ok=True)
+        model.autoencoder.save_pretrained(
+            save_directory=save_dir, repo_id=repo_id, push_to_hub=True
+        )
 
 
 if __name__ == "__main__":
+    for path in [
+        "wandb_logs/lightning_logs/cysbok4l/checkpoints/epoch=0-step=7616.ckpt",
+        "wandb_logs/lightning_logs/umnlx5er/checkpoints/epoch=0-step=7616.ckpt",
+        "wandb_logs/lightning_logs/9hk1ip5h/checkpoints/epoch=0-step=7616.ckpt",
+    ]:
+        upload_models(path)
+
+    raise SystemExit
+
     for path in find_ckpt_paths(step=7616):
         upload_models(path)
 
