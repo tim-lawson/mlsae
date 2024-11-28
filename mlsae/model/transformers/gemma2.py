@@ -119,6 +119,8 @@ class GemmaTransformer(Module):
         output = self.model.model.forward(
             input_ids=tokens,  # type: ignore
             output_hidden_states=True,
+            past_key_values=None,
+            use_cache=False,
             skip_final_layer_norm=True,
         )
         hidden_states: tuple[torch.Tensor, ...] = output.hidden_states  # type: ignore
