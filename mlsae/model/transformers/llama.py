@@ -14,15 +14,15 @@ from transformers import (
 from transformers.modeling_attn_mask_utils import (
     _prepare_4d_causal_attention_mask_for_sdpa,
 )
+from transformers.models.llama.configuration_llama import LlamaConfig
 
-from .models.gpt2.modeling_gpt2 import (
-    GPT2Block,
-    GPT2Config,
-    GPT2LMHeadModel,
+from .models.llama.modeling_llama import (
+    LlamaDecoderLayer,
+    LlamaForCausalLM,
 )
 
 
-class GPT2Transformer(Module):
+class LlamaTransformer(Module):
     def __init__(
         self,
         model_name: str,
@@ -34,7 +34,7 @@ class GPT2Transformer(Module):
     ) -> None:
         """
         Args:
-            model_name (str): The name of a pretrained GPT2LMHeadModel model.
+            model_name (str): The name of a pretrained LlamaForCausalLM model.
 
             max_length (int): The maximum length of a tokenized input sequence.
 
@@ -56,22 +56,22 @@ class GPT2Transformer(Module):
         device = device or torch.device("cpu")
 
         self.model_name = model_name
-        self.model: GPT2LMHeadModel = GPT2LMHeadModel.from_pretrained(model_name)  # type: ignore
+        self.model: LlamaForCausalLM = LlamaForCausalLM.from_pretrained(model_name)  # type: ignore
         self.model.eval()
 
         self.batch_size = batch_size
         self.max_length = max_length
 
-        self.config: GPT2Config = self.model.config  # type: ignore
+        self.config: LlamaConfig = self.model.config  # type: ignore
         self.tokenizer: PreTrainedTokenizer | PreTrainedTokenizerFast = (
             AutoTokenizer.from_pretrained(model_name)
         )
 
         if layers is not None:
-            assert all(0 <= i < self.config.n_layer for i in layers)
+            assert all(0 <= i < self.config.num_hidden_layers for i in layers)
             self.layers = layers
         else:
-            self.layers = list(range(self.config.n_layer))
+            self.layers = list(range(self.config.num_hidden_layers))
 
         self.n_layers = len(self.layers)
         self.skip_special_tokens = skip_special_tokens
@@ -116,7 +116,7 @@ class GPT2Transformer(Module):
             out (list[Float[Tensor, "batch pos d_model"]]): The hidden states.
         """
 
-        output = self.model.transformer.forward(
+        output = self.model.model.forward(
             input_ids=tokens,  # type: ignore
             output_hidden_states=True,
             skip_final_layer_norm=True,
@@ -204,8 +204,8 @@ class GPT2Transformer(Module):
         # Get the hidden states at the specified layer
         hidden_states = inputs_embeds[start_at_layer, ...]
 
-        layer: GPT2Block
-        for i, layer in enumerate(self.model.transformer.h):  # type: ignore
+        layer: LlamaDecoderLayer
+        for i, layer in enumerate(self.model.model.layers):  # type: ignore
             # Skip layers before the specified layer
             if start_at_layer >= i:
                 continue
@@ -213,7 +213,7 @@ class GPT2Transformer(Module):
             outputs = layer.forward(hidden_states, attention_mask=attention_mask)  # type: ignore
             hidden_states = outputs[0]  # type: ignore
 
-        hidden_states = self.model.transformer.ln_f.forward(hidden_states)
+        hidden_states = self.model.model.norm.forward(hidden_states)
         logits: torch.Tensor = self.model.lm_head.forward(hidden_states)
 
         if return_type == "logits":

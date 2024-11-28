@@ -2,6 +2,7 @@ import functools
 import weakref
 
 import torch
+from transformers import PreTrainedTokenizer, PreTrainedTokenizerFast
 
 from mlsae.model import MLSAETransformer, TopK, TopKSAE
 
@@ -160,3 +161,13 @@ def forward_single_layer(
         topk.values[layer] = topk_.values
     model.autoencoder.standardize = standardize
     return inputs, recons, topk
+
+
+def get_input_ids(
+    tokenizer: PreTrainedTokenizer | PreTrainedTokenizerFast, prompt: str
+) -> torch.LongTensor:
+    pad_token_id = tokenizer.pad_token_id or tokenizer.eos_token_id
+    input_ids = tokenizer.encode(prompt)
+    return torch.LongTensor(
+        [input_ids + [pad_token_id] * (tokenizer.model_max_length - len(input_ids))]
+    )

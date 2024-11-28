@@ -1,6 +1,7 @@
 import os
 from dataclasses import dataclass
 
+import pandas as pd
 import torch
 from matplotlib.colors import PowerNorm
 from simple_parsing import parse
@@ -49,6 +50,8 @@ def get_heatmap_data(
 
     latents = scatter_topk(topk, model.n_latents).squeeze()
 
+    probs = latents.sum(dim=1) / latents.sum(dim=1).sum(dim=0, keepdim=True)
+
     if config.mode == "counts":
         data = latents.where(latents.gt(config.dead_threshold), 0).float().sum(dim=1)
     elif config.mode == "totals":
@@ -60,10 +63,12 @@ def get_heatmap_data(
         raise ValueError(f"Invalid mode: {config.mode}")
 
     # Exclude latents that never activate
-    data = data[:, torch.any(data.gt(0), dim=0)]
+    mask = torch.any(data.gt(0), dim=0)
+    data = data[:, mask]
 
     layers = torch.arange(0, model.n_layers, device=device).unsqueeze(-1)
-    _, indices = (data * layers).sum(0).sort(descending=True)
+
+    _, indices = (probs[:, mask] * layers).sum(0).sort(descending=True)
 
     return data[:, indices]
 
@@ -78,8 +83,9 @@ def sweep(
     os.makedirs(out, exist_ok=True)
     norm = None if config.mode == "probs" else PowerNorm(config.gamma)
     for repo_id in config.repo_ids(transformer=True, tuned_lens=config.tuned_lens):
+        data = get_heatmap_data(config, repo_id, device)
         save_heatmap(
-            get_heatmap_data(config, repo_id, device).cpu(),
+            data.cpu(),
             os.path.join(out, get_heatmap_filename(repo_id, config.mode)),
             norm=norm,
         )

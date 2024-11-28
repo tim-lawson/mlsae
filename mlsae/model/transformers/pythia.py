@@ -1,10 +1,10 @@
-# TODO: Share code with mlsae/model/transformer_gpt2.py.
+# TODO: Share code between Pythia, GPT-2, and Llama.
 
 from typing import Literal, overload
 
 import torch
 from jaxtyping import Bool, Float, Int
-from torch import FloatTensor, Tensor
+from torch import Tensor
 from torch.nn import CrossEntropyLoss, Module
 from transformers import (
     AutoTokenizer,
@@ -14,6 +14,7 @@ from transformers import (
     PreTrainedTokenizer,
     PreTrainedTokenizerFast,
 )
+from transformers.models.gpt_neox.modeling_gpt_neox import GPTNeoXLayer
 
 
 class PythiaTransformer(Module):
@@ -132,19 +133,20 @@ class PythiaTransformer(Module):
 
         out: list[Float[Tensor, "batch pos d_model"]] = []
 
-        # NOTE: GPTNeoXModel includes the input embeddings in hidden_states, we don't
+        # We don't include the input embeddings in hidden_states.
         inputs_embeds = self.model.gpt_neox.embed_in(tokens)
         hidden_states = self.model.gpt_neox.emb_dropout(inputs_embeds)
 
-        for layer in self.model.gpt_neox.layers:
-            hidden_states = layer(
+        layer: GPTNeoXLayer
+        for layer in self.model.gpt_neox.layers:  # type: ignore
+            hidden_states = layer.forward(
                 hidden_states,
-                attention_mask=attention_mask,
-                position_ids=position_ids,
+                attention_mask=attention_mask,  # type: ignore
+                position_ids=position_ids,  # type: ignore
             )[0]
             out = out + [hidden_states]
 
-        # NOTE: Skip the final layer norm
+        # Skip the final layer norm.
         return out
 
     @overload
@@ -245,7 +247,7 @@ class PythiaTransformer(Module):
             self.model.gpt_neox.final_layer_norm.bias,
             eps=self.model.gpt_neox.final_layer_norm.eps,
         )
-        logits: FloatTensor = self.model.embed_out(hidden_states)
+        logits: Tensor = self.model.embed_out.forward(hidden_states)
 
         if return_type == "logits":
             return logits
@@ -262,6 +264,7 @@ class PythiaTransformer(Module):
 
         return loss, logits
 
+    # TODO: Implement this properly
     @torch.no_grad()
     def _mask_special_tokens(
         self, tokens: Int[Tensor, "batch pos"]

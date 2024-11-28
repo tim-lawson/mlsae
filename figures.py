@@ -169,6 +169,7 @@ sweeps: list[FigureSweep] = [
     # Varying model for R = 64 and k = 32
     FigureSweep(
         id="model_name",
+        enabled=True,
         model_name=[pythia_70m, pythia_160m, pythia_410m, pythia_1b],
         expansion_factor=[64],
         k=[32],
@@ -177,6 +178,7 @@ sweeps: list[FigureSweep] = [
     # Varying model with tuned lens for R = 64 and k = 32
     FigureSweep(
         id="lens_model_name",
+        enabled=True,
         model_name=[pythia_70m, pythia_160m, pythia_410m],
         expansion_factor=[64],
         k=[32],
@@ -185,6 +187,7 @@ sweeps: list[FigureSweep] = [
     # Varying R for Pythia-70m and k = 32
     FigureSweep(
         id="pythia-70m-deduped_expansion_factor",
+        enabled=True,
         model_name=[pythia_70m],
         expansion_factor=expansion_factors,
         k=[32],
@@ -193,6 +196,7 @@ sweeps: list[FigureSweep] = [
     # Varying k for Pythia-70m and R = 64
     FigureSweep(
         id="pythia-70m-deduped_k",
+        enabled=True,
         model_name=[pythia_70m],
         expansion_factor=[64],
         k=ks,
@@ -201,6 +205,7 @@ sweeps: list[FigureSweep] = [
     # Varying R for Pythia-160m and k = 32
     FigureSweep(
         id="pythia-160m-deduped_expansion_factor",
+        enabled=True,
         model_name=[pythia_160m],
         expansion_factor=expansion_factors,
         k=[32],
@@ -209,6 +214,7 @@ sweeps: list[FigureSweep] = [
     # Varying k for Pythia-160m and R = 64
     FigureSweep(
         id="pythia-160m-deduped_k",
+        enabled=True,
         model_name=[pythia_160m],
         expansion_factor=[64],
         k=ks,
@@ -217,6 +223,7 @@ sweeps: list[FigureSweep] = [
     # Varying R for Pythia-70m with tuned lens and k = 32
     FigureSweep(
         id="pythia-70m-deduped_lens_expansion_factor",
+        enabled=True,
         model_name=[pythia_70m],
         expansion_factor=expansion_factors,
         k=[32],
@@ -225,6 +232,7 @@ sweeps: list[FigureSweep] = [
     # Varying k for Pythia-70m with tuned lens and R = 64
     FigureSweep(
         id="pythia-70m-deduped_lens_k",
+        enabled=True,
         model_name=[pythia_70m],
         expansion_factor=[64],
         k=ks,
@@ -234,10 +242,10 @@ sweeps: list[FigureSweep] = [
     FigureSweep(
         id="gpt2",
         model_name=[gpt2_small],
+        enabled=True,
         expansion_factor=[64],
         k=[32],
         tuned_lens=False,
-        enabled=True,
     ),
 ]
 
