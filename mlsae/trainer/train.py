@@ -1,4 +1,5 @@
 import math
+import subprocess
 from typing import cast
 
 import wandb
@@ -12,6 +13,10 @@ from mlsae.trainer.config import RunConfig, initialize
 
 
 def train(config: RunConfig) -> None:
+    subprocess.call(
+        "echo $(nvidia-smi --query-gpu=memory.used --format=csv,noheader)", shell=True
+    )
+
     initialize(config.seed)
 
     train_dataloader = get_train_dataloader(

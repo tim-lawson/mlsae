@@ -17,8 +17,8 @@ from mlsae.metrics import (
     DeadLatents,
     LayerwiseFVU,
     LayerwiseL1Norm,
-    LayerwiseLogitKLDiv,
-    LayerwiseLogitMSE,
+    # LayerwiseLogitKLDiv,
+    # LayerwiseLogitMSE,
     LayerwiseLossDelta,
     LayerwiseMSE,
     LayerwiseWrapper,
@@ -32,6 +32,7 @@ from mlsae.model.autoencoders import (
 )
 from mlsae.model.geom_median import geometric_median
 from mlsae.model.transformers import GPT2Transformer, PythiaTransformer
+from mlsae.model.transformers.gemma2 import GemmaTransformer
 from mlsae.model.transformers.llama import LlamaTransformer
 
 
@@ -93,8 +94,8 @@ def create_untransform_hidden(tuned_lens: TunedLens):
 class MLSAETransformer(LightningModule, PyTorchModelHubMixin):
     loss_true: Float[torch.Tensor, "n_layers"]
     loss_pred: Float[torch.Tensor, "n_layers"]
-    logits_true: Float[torch.Tensor, "n_layers pos d_vocab"]
-    logits_pred: Float[torch.Tensor, "n_layers pos d_vocab"]
+    # logits_true: Float[torch.Tensor, "n_layers pos d_vocab"]
+    # logits_pred: Float[torch.Tensor, "n_layers pos d_vocab"]
 
     def __init__(
         self,
@@ -205,6 +206,8 @@ class MLSAETransformer(LightningModule, PyTorchModelHubMixin):
             self.transformer = GPT2Transformer(**transformer_kwargs)
         elif "llama" in model_name:
             self.transformer = LlamaTransformer(**transformer_kwargs)
+        elif "gemma" in model_name:
+            self.transformer = GemmaTransformer(**transformer_kwargs)
         else:
             raise ValueError(f"Unknown model name: {model_name}")
         self.transformer.eval()
@@ -260,26 +263,26 @@ class MLSAETransformer(LightningModule, PyTorchModelHubMixin):
                 "loss/delta": wrap(
                     LayerwiseLossDelta(self.n_layers), prefix="loss/delta/"
                 ),
-                "logit/mse": wrap(
-                    LayerwiseLogitMSE(self.n_layers), prefix="logit/mse/"
-                ),
-                "logit/kldiv": wrap(
-                    LayerwiseLogitKLDiv(self.n_layers), prefix="logit/kldiv/"
-                ),
+                # "logit/mse": wrap(
+                #     LayerwiseLogitMSE(self.n_layers), prefix="logit/mse/"
+                # ),
+                # "logit/kldiv": wrap(
+                #     LayerwiseLogitKLDiv(self.n_layers), prefix="logit/kldiv/"
+                # ),
             },
             prefix="val/",
         )
 
-        logits = (
-            self.n_layers,
-            self.transformer.batch_size,
-            self.transformer.max_length,
-            self.transformer.config.vocab_size,
-        )
+        # logits = (
+        #     self.n_layers,
+        #     self.transformer.batch_size,
+        #     self.transformer.max_length,
+        #     self.transformer.config.vocab_size,
+        # )
         self.register_buffer("loss_true", torch.zeros(self.n_layers))
         self.register_buffer("loss_pred", torch.zeros(self.n_layers))
-        self.register_buffer("logits_true", torch.zeros(logits))
-        self.register_buffer("logits_pred", torch.zeros(logits))
+        # self.register_buffer("logits_true", torch.zeros(logits))
+        # self.register_buffer("logits_pred", torch.zeros(logits))
 
     def forward(self, tokens: Int[torch.Tensor, "batch pos"]) -> TopKSAEOut:
         inputs = self.forward_lens(self.transformer.forward(tokens))
@@ -349,17 +352,17 @@ class MLSAETransformer(LightningModule, PyTorchModelHubMixin):
         tokens: Int[torch.Tensor, "batch pos"],
     ) -> None:
         for layer in range(self.n_layers):
-            loss, logits = self.transformer.forward_at_layer(
-                inputs, layer, return_type="both", tokens=tokens
+            loss = self.transformer.forward_at_layer(
+                inputs, layer, return_type="loss", tokens=tokens
             )
             self.loss_true[layer] = loss
-            self.logits_true[layer] = logits
+            # self.logits_true[layer] = logits
 
-            loss, logits = self.transformer.forward_at_layer(
-                recons, layer, return_type="both", tokens=tokens
+            loss = self.transformer.forward_at_layer(
+                recons, layer, return_type="loss", tokens=tokens
             )
             self.loss_pred[layer] = loss
-            self.logits_pred[layer] = logits
+            # self.logits_pred[layer] = logits
 
     @torch.no_grad()
     def validation_step(self, batch: dict[str, Int[torch.Tensor, "batch pos"]]) -> None:
@@ -372,8 +375,8 @@ class MLSAETransformer(LightningModule, PyTorchModelHubMixin):
         val_metrics = self.val_metrics.forward(
             loss_true=self.loss_true,
             loss_pred=self.loss_pred,
-            logits_true=self.logits_true,
-            logits_pred=self.logits_pred,
+            # logits_true=self.logits_true,
+            # logits_pred=self.logits_pred,
         )
 
         self.log_dict(val_metrics)
@@ -398,8 +401,8 @@ class MLSAETransformer(LightningModule, PyTorchModelHubMixin):
         val_metrics = self.val_metrics.forward(
             loss_true=self.loss_true,
             loss_pred=self.loss_pred,
-            logits_true=self.logits_true,
-            logits_pred=self.logits_pred,
+            # logits_true=self.logits_true,
+            # logits_pred=self.logits_pred,
         )
 
         mse_loss = self.mse_loss.forward(inputs=inputs, recons=recons)
@@ -425,8 +428,8 @@ class MLSAETransformer(LightningModule, PyTorchModelHubMixin):
     def on_train_end(self) -> None:
         del self.loss_true
         del self.loss_pred
-        del self.logits_true
-        del self.logits_pred
+        # del self.logits_true
+        # del self.logits_pred
         del self.autoencoder.last_nonzero
 
     def configure_optimizers(self):

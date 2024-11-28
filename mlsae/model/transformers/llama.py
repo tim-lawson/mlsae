@@ -1,4 +1,4 @@
-# TODO: Share code between Pythia, GPT-2, and Llama.
+# TODO: Share code between transformers.
 
 from typing import Literal, overload
 
