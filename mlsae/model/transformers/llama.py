@@ -194,6 +194,10 @@ class LlamaTransformer(Module):
         input_shape = inputs_embeds.size()[:-1]
         batch_size = inputs_embeds.shape[0]
 
+        position_ids = torch.arange(
+            0, input_shape[-1], dtype=torch.long, device=inputs_embeds.device
+        ).unsqueeze(0)
+
         attention_mask = _prepare_4d_causal_attention_mask_for_sdpa(
             attention_mask=None,
             input_shape=(batch_size, input_shape[-1]),
@@ -210,7 +214,11 @@ class LlamaTransformer(Module):
             if start_at_layer >= i:
                 continue
 
-            outputs = layer.forward(hidden_states, attention_mask=attention_mask)  # type: ignore
+            outputs = layer.forward(
+                hidden_states,
+                attention_mask=attention_mask,
+                position_ids=position_ids,  # type: ignore
+            )
             hidden_states = outputs[0]  # type: ignore
 
         hidden_states = self.model.model.norm.forward(hidden_states)

@@ -32,6 +32,7 @@ from mlsae.model.autoencoders import (
 )
 from mlsae.model.geom_median import geometric_median
 from mlsae.model.transformers import GPT2Transformer, PythiaTransformer
+from mlsae.model.transformers.llama import LlamaTransformer
 
 
 @dataclass
@@ -41,7 +42,7 @@ class MLSAEConfig(Serializable):
     dead_tokens_threshold: int = 10_000_000
     """The number of tokens after which a latent is flagged as dead during training."""
 
-    expansion_factor: int = 16
+    expansion_factor: int = 64
     """The ratio of the number of latents to the number of inputs."""
 
     k: int = 32
@@ -189,25 +190,21 @@ class MLSAETransformer(LightningModule, PyTorchModelHubMixin):
             // (self.batch_size * self.max_length * self.accumulate_grad_batches)
         )
 
+        transformer_kwargs = {
+            "model_name": self.model_name,
+            "max_length": self.max_length,
+            "batch_size": self.batch_size,
+            "skip_special_tokens": self.skip_special_tokens,
+            "layers": layers,
+            "device": self.device,
+        }
         # TODO: Improve this...
         if "pythia" in model_name:
-            self.transformer = PythiaTransformer(
-                self.model_name,
-                self.max_length,
-                self.batch_size,
-                self.skip_special_tokens,
-                layers=layers,
-                device=self.device,
-            )
+            self.transformer = PythiaTransformer(**transformer_kwargs)
         elif "gpt2" in model_name:
-            self.transformer = GPT2Transformer(
-                self.model_name,
-                self.max_length,
-                self.batch_size,
-                self.skip_special_tokens,
-                layers=layers,
-                device=self.device,
-            )
+            self.transformer = GPT2Transformer(**transformer_kwargs)
+        elif "llama" in model_name:
+            self.transformer = LlamaTransformer(**transformer_kwargs)
         else:
             raise ValueError(f"Unknown model name: {model_name}")
         self.transformer.eval()
