@@ -34,6 +34,7 @@ from mlsae.model.geom_median import geometric_median
 from mlsae.model.transformers import GPT2Transformer, PythiaTransformer
 from mlsae.model.transformers.gemma2 import GemmaTransformer
 from mlsae.model.transformers.llama import LlamaTransformer
+from mlsae.model_card import model_card_template
 
 
 @dataclass
@@ -91,11 +92,20 @@ def create_untransform_hidden(tuned_lens: TunedLens):
     return untransform_hidden
 
 
-class MLSAETransformer(LightningModule, PyTorchModelHubMixin):
+class MLSAETransformer(
+    LightningModule,
+    PyTorchModelHubMixin,
+    model_card_template=model_card_template(True),
+    license="mit",
+    language="en",
+    library_name="mlsae",
+    repo_url="https://github.com/tim-lawson/mlsae",
+    tags=["arxiv:2409.04185"],
+):
     loss_true: Float[torch.Tensor, "n_layers"]
     loss_pred: Float[torch.Tensor, "n_layers"]
-    # logits_true: Float[torch.Tensor, "n_layers pos d_vocab"]
-    # logits_pred: Float[torch.Tensor, "n_layers pos d_vocab"]
+    logits_true: Float[torch.Tensor, "n_layers pos d_vocab"]
+    logits_pred: Float[torch.Tensor, "n_layers pos d_vocab"]
 
     def __init__(
         self,

@@ -8,6 +8,7 @@ from torch.nn import Linear, Module, Parameter
 
 from mlsae.model.decoder import decode
 from mlsae.model.types import Stats, TopK
+from mlsae.model_card import model_card_template
 
 from .utils import standardize, unit_norm_decoder
 
@@ -31,7 +32,16 @@ class TopKSAEOut(NamedTuple):
     """The fraction of dead latents."""
 
 
-class TopKSAE(Module, PyTorchModelHubMixin):
+class TopKSAE(
+    Module,
+    PyTorchModelHubMixin,
+    model_card_template=model_card_template(False),
+    license="mit",
+    language="en",
+    library_name="mlsae",
+    repo_url="https://github.com/tim-lawson/mlsae",
+    tags=["arxiv:2409.04185"],
+):
     last_nonzero: torch.Tensor
     """The number of steps since the latents have activated."""
 

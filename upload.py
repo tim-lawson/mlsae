@@ -3,8 +3,6 @@ import os
 from mlsae.model import MLSAETransformer
 from mlsae.utils import get_model_repo_id
 
-dry_run = False
-
 
 def find_ckpt_paths(
     ckpt_dir: str = "wandb_logs/lightning_logs", step: int = 7616
@@ -17,9 +15,9 @@ def find_ckpt_paths(
     return paths
 
 
-def upload_models(ckpt_path: str) -> None:
+def upload_models(ckpt_path: str, dry_run: bool) -> None:
     print(f"loading from: {ckpt_path}")
-    model = MLSAETransformer.load_from_checkpoint(ckpt_path)
+    model = MLSAETransformer.load_from_checkpoint(ckpt_path, strict=False)
 
     # Remove the buffers, if we haven't already. This saves A LOT of space!
     if hasattr(model, "loss_true"):
@@ -41,7 +39,16 @@ def upload_models(ckpt_path: str) -> None:
     if not dry_run:
         os.makedirs(save_dir_tfm, exist_ok=True)
         model.save_pretrained(
-            save_directory=save_dir_tfm, repo_id=repo_id_tfm, push_to_hub=True
+            save_directory=save_dir_tfm,
+            repo_id=repo_id_tfm,
+            push_to_hub=True,
+            model_card_kwargs=dict(
+                model_id=repo_id_tfm,
+                base_model=model.model_name,
+                model_name=model.model_name,
+                expansion_factor=model.expansion_factor,
+                k=model.k,
+            ),
         )
 
     # The PyTorch autoencoder module, which is much smaller.
@@ -52,23 +59,33 @@ def upload_models(ckpt_path: str) -> None:
     if not dry_run:
         os.makedirs(save_dir, exist_ok=True)
         model.autoencoder.save_pretrained(
-            save_directory=save_dir, repo_id=repo_id, push_to_hub=True
+            save_directory=save_dir,
+            repo_id=repo_id,
+            push_to_hub=True,
+            model_card_kwargs=dict(
+                model_id=repo_id,
+                base_model=model.model_name,
+                model_name=model.model_name,
+                expansion_factor=model.expansion_factor,
+                k=model.k,
+            ),
         )
 
 
 if __name__ == "__main__":
-    for path in [
-        "wandb_logs/lightning_logs/cysbok4l/checkpoints/epoch=0-step=7616.ckpt",
-        "wandb_logs/lightning_logs/umnlx5er/checkpoints/epoch=0-step=7616.ckpt",
-        "wandb_logs/lightning_logs/9hk1ip5h/checkpoints/epoch=0-step=7616.ckpt",
-    ]:
-        upload_models(path)
+    dry_run = False
 
-    raise SystemExit
+    # for path in [
+    #     "wandb_logs/lightning_logs/fqqnmq6p/checkpoints/epoch=0-step=2368.ckpt",
+    #     "wandb_logs/lightning_logs/zabxb19f/checkpoints/epoch=0-step=3200.ckpt",
+    # ]:
+    #     upload_models(path)
+
+    # raise SystemExit
 
     for path in find_ckpt_paths(step=7616):
-        upload_models(path)
+        upload_models(path, dry_run)
 
     # NOTE: GPT-2 has max_length 1024, so we have twice as many steps for 1B tokens.
     for path in find_ckpt_paths(step=15232):
-        upload_models(path)
+        upload_models(path, dry_run)
