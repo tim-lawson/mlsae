@@ -1,31 +1,31 @@
+# TODO: Share code between transformers.
+
 from typing import Literal, overload
 
 import torch
 from jaxtyping import Bool, Float, Int
-from torch import FloatTensor, Tensor
+from torch import Tensor
 from torch.nn import CrossEntropyLoss, Module
 from transformers import (
     AutoTokenizer,
     GPTNeoXConfig,
     GPTNeoXForCausalLM,
+    GPTNeoXModel,
     PreTrainedTokenizer,
     PreTrainedTokenizerFast,
 )
-from transformers.models.gpt_neox.modeling_gpt_neox import (
-    _prepare_4d_causal_attention_mask,
-)
+from transformers.models.gpt_neox.modeling_gpt_neox import GPTNeoXLayer
 
 
-class Transformer(Module):
+class PythiaTransformer(Module):
     def __init__(
         self,
         model_name: str,
         max_length: int,
         batch_size: int,
         skip_special_tokens: bool = True,
-        # TODO: Check this works for non-consecutive layers
         layers: list[int] | None = None,
-        device: torch.device | str = "cpu",
+        device: torch.device | None = None,
     ) -> None:
         """
         Args:
@@ -47,6 +47,8 @@ class Transformer(Module):
         """
 
         super().__init__()
+
+        device = device or torch.device("cpu")
 
         self.model_name = model_name
         self.model: GPTNeoXForCausalLM = GPTNeoXForCausalLM.from_pretrained(model_name)  # type: ignore
@@ -74,20 +76,24 @@ class Transformer(Module):
             0, self.max_length, dtype=torch.long, device=device
         ).unsqueeze(0)
 
-        self.attention_mask: Tensor = _prepare_4d_causal_attention_mask(
-            attention_mask=None,
-            input_shape=(batch_size, max_length),
-            # We only actually need the device and dtype of the inputs
-            inputs_embeds=torch.empty(0, dtype=torch.float32, device=device),
-            past_key_values_length=0,
-        )  # type: ignore
+        self.attention_mask: Tensor = (
+            GPTNeoXModel._prepare_4d_causal_attention_mask_with_cache_position(
+                attention_mask=None,  # type: ignore
+                sequence_length=self.max_length,
+                target_length=self.max_length,
+                dtype=torch.float32,
+                device=device or torch.device("cpu"),
+                cache_position=torch.tensor(0),
+                batch_size=batch_size,
+            )
+        )
 
         self.loss = CrossEntropyLoss()
 
     @torch.no_grad()
     def forward(
         self, tokens: Int[Tensor, "batch pos"]
-    ) -> Float[Tensor, "n_layers batch pos d_model"]:
+    ) -> Float[Tensor, "layer batch pos d_model"]:
         """
         Returns the residual stream activation vectors from the specified layers.
 
@@ -95,7 +101,7 @@ class Transformer(Module):
             tokens (Int[Tensor, "batch pos"]): The input tokens.
 
         Returns:
-            out (Float[Tensor, "n_layers batch pos d_model"]): The residual stream
+            out (Float[Tensor, "layer batch pos d_model"]): The residual stream
                 activation vectors from the specified layers.
         """
 
@@ -127,25 +133,26 @@ class Transformer(Module):
 
         out: list[Float[Tensor, "batch pos d_model"]] = []
 
-        # NOTE: GPTNeoXModel includes the input embeddings in hidden_states, we don't
+        # We don't include the input embeddings in hidden_states.
         inputs_embeds = self.model.gpt_neox.embed_in(tokens)
         hidden_states = self.model.gpt_neox.emb_dropout(inputs_embeds)
 
-        for layer in self.model.gpt_neox.layers:
-            hidden_states = layer(
+        layer: GPTNeoXLayer
+        for layer in self.model.gpt_neox.layers:  # type: ignore
+            hidden_states = layer.forward(
                 hidden_states,
-                attention_mask=attention_mask,
-                position_ids=position_ids,
+                attention_mask=attention_mask,  # type: ignore
+                position_ids=position_ids,  # type: ignore
             )[0]
             out = out + [hidden_states]
 
-        # NOTE: Skip the final layer norm
+        # Skip the final layer norm.
         return out
 
     @overload
     def forward_at_layer(
         self,
-        input: Float[Tensor, "batch pos d_model"],
+        inputs_embeds: Float[Tensor, "layer batch pos d_model"],
         start_at_layer: int,
         return_type: Literal["loss"],
         tokens: Int[Tensor, "batch pos"] | None = None,
@@ -154,7 +161,7 @@ class Transformer(Module):
     @overload
     def forward_at_layer(
         self,
-        input: Float[Tensor, "batch pos d_model"],
+        inputs_embeds: Float[Tensor, "layer batch pos d_model"],
         start_at_layer: int,
         return_type: Literal["logits"],
         tokens: Int[Tensor, "batch pos"] | None = None,
@@ -163,7 +170,7 @@ class Transformer(Module):
     @overload
     def forward_at_layer(
         self,
-        input: Float[Tensor, "batch pos d_model"],
+        inputs_embeds: Float[Tensor, "layer batch pos d_model"],
         start_at_layer: int,
         return_type: Literal["both"],
         tokens: Int[Tensor, "batch pos"] | None = None,
@@ -172,7 +179,7 @@ class Transformer(Module):
     @torch.no_grad()
     def forward_at_layer(
         self,
-        input: Float[Tensor, "batch pos d_model"],
+        inputs_embeds: Float[Tensor, "layer batch pos d_model"],
         start_at_layer: int,
         return_type: Literal["loss", "logits", "both"] = "both",
         tokens: Int[Tensor, "batch pos"] | None = None,
@@ -189,7 +196,7 @@ class Transformer(Module):
         Also similar to the TransformerLens API.
 
         Args:
-            inputs (Float[torch.Tensor, "layer batch pos n_inputs"]): The residual
+            inputs (Float[torch.Tensor, "layer batch pos d_model"]): The residual
                 stream activations at the specified layer.
 
             start_at_layer (int): The layer at which to start the forward pass.
@@ -208,14 +215,18 @@ class Transformer(Module):
             raise ValueError("The input tokens are needed to compute the loss.")
 
         if tokens is None:
-            tokens = torch.zeros(input.shape[0], input.shape[1], device=input.device)
+            tokens = torch.zeros(
+                inputs_embeds.shape[0],
+                inputs_embeds.shape[1],
+                device=inputs_embeds.device,
+            )
 
         # Move tensors to the correct device, which we don't know in the constructor
         self.position_ids = self._position_ids(tokens)
         self.attention_mask = self._attention_mask(tokens)
 
         # Get the hidden states at the specified layer
-        hidden_states = input[start_at_layer, ...]
+        hidden_states = inputs_embeds[start_at_layer, ...]
 
         for i, layer in enumerate(self.model.gpt_neox.layers):
             # Skip layers before the specified layer
@@ -236,7 +247,7 @@ class Transformer(Module):
             self.model.gpt_neox.final_layer_norm.bias,
             eps=self.model.gpt_neox.final_layer_norm.eps,
         )
-        logits: FloatTensor = self.model.embed_out(hidden_states)
+        logits: Tensor = self.model.embed_out.forward(hidden_states)
 
         if return_type == "logits":
             return logits
@@ -253,6 +264,7 @@ class Transformer(Module):
 
         return loss, logits
 
+    # TODO: Implement this properly
     @torch.no_grad()
     def _mask_special_tokens(
         self, tokens: Int[Tensor, "batch pos"]
@@ -283,12 +295,15 @@ class Transformer(Module):
 
     def _attention_mask(self, tokens: Int[Tensor, "batch pos"]) -> Tensor:
         if tokens.shape != (self.batch_size, self.max_length):
-            return _prepare_4d_causal_attention_mask(
-                attention_mask=None,
-                input_shape=tokens.shape,
-                inputs_embeds=torch.empty(0, dtype=torch.float32, device=tokens.device),
-                past_key_values_length=0,
-            )  # type: ignore
+            return GPTNeoXModel._prepare_4d_causal_attention_mask_with_cache_position(
+                attention_mask=None,  # type: ignore
+                sequence_length=self.max_length,
+                target_length=self.max_length,
+                dtype=torch.float32,
+                device=tokens.device or torch.device("cpu"),
+                cache_position=torch.tensor(0),
+                batch_size=self.batch_size,
+            )
 
         return self.attention_mask.to(device=tokens.device)
 

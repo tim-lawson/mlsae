@@ -11,6 +11,8 @@ class LayerwiseWrapper(ClasswiseWrapper):
         super().__init__(metric, labels=labels, prefix=prefix)
 
     def _convert_output(self, x: Float[torch.Tensor, "layer"]) -> dict:
+        if x.ndim == 0:
+            x = x.unsqueeze(0)
         metrics = super()._convert_output(x)
         return {**metrics, f"{self._prefix}avg": x.mean(dim=0, dtype=torch.float)}
 

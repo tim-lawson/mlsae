@@ -8,8 +8,7 @@ from simple_parsing import parse
 from tqdm import tqdm
 from tuned_lens import TunedLens
 
-from mlsae.model import Transformer
-from mlsae.model.data import get_test_dataloader
+from mlsae.model import PythiaTransformer, get_test_dataloader
 from mlsae.trainer import RunConfig, initialize
 from mlsae.utils import get_device, normalize
 
@@ -37,14 +36,19 @@ class VarianceMetric:
 
 
 @torch.no_grad()
-def save_resid_cos_sim(config: RunConfig, device: torch.device | str = "cpu") -> None:
-    transformer = Transformer(
+def main(
+    config: RunConfig, device: torch.device, out: str | os.PathLike[str] = ".out"
+) -> None:
+    os.makedirs(out, exist_ok=True)
+    initialize(config.seed)
+
+    transformer = PythiaTransformer(
         config.model_name,
         config.data.max_length,
         config.data.batch_size,
         config.autoencoder.skip_special_tokens,
         layers=config.layers,
-        device=device,
+        device=torch.device(device),
     )
     transformer.model.to(device)  # type: ignore
 
@@ -125,11 +129,8 @@ def save_resid_cos_sim(config: RunConfig, device: torch.device | str = "cpu") ->
 
     df = pd.DataFrame(data)
     df.index.name = "start_at_layer"
-    df.to_csv(os.path.join("out", f"resid_cos_sim_{lens_name}{model_name}.csv"))
+    df.to_csv(os.path.join(out, f"resid_cos_sim_{lens_name}{model_name}.csv"))
 
 
 if __name__ == "__main__":
-    config = parse(RunConfig)
-    device = get_device()
-    initialize(config.seed)
-    save_resid_cos_sim(config, device)
+    main(parse(RunConfig), get_device())

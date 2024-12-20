@@ -8,13 +8,16 @@ import torch
 from simple_parsing import field, parse
 from transformers import AutoTokenizer, GPTNeoXForCausalLM
 
-from mlsae.model import MLSAE
-from mlsae.trainer.config import SweepConfig, initialize
+from mlsae.model import MLSAETransformer
+from mlsae.trainer.config import SweepConfig
 from mlsae.utils import get_device, get_repo_id, normalize
 
 
 @dataclass
 class Config(SweepConfig):
+    filename: str = "embed_sim.csv"
+    """The name of the file to save the results to."""
+
     latents: list[int] = field(default_factory=lambda: [])
     """The latent indices to find the most similar embeddings to."""
 
@@ -26,12 +29,11 @@ class Config(SweepConfig):
 
 
 @torch.no_grad()
-def get_embed_cos_sim(
-    config: Config, repo_id: str, model_name: str
+def get_similar_embeds(
+    config: Config, repo_id: str, model_name: str, device: torch.device
 ) -> tuple[torch.Tensor, torch.Tensor]:
     tokenizer = AutoTokenizer.from_pretrained(model_name)
-
-    mlsae = MLSAE.from_pretrained(repo_id).to(device)
+    mlsae = MLSAETransformer.from_pretrained(repo_id).to(device).autoencoder
     W_dec = normalize(mlsae.decoder.weight)
     if len(config.latents) > 0:
         W_dec = W_dec[:, config.latents]
@@ -65,15 +67,20 @@ def get_embed_cos_sim(
     return topk_in.values[0, :], topk_out.values[0, :]
 
 
-if __name__ == "__main__":
-    config = parse(Config)
-    device = get_device()
-    initialize(config.seed)
-
+def main(
+    config: Config, device: torch.device, out: str | os.PathLike[str] = ".out"
+) -> None:
+    os.makedirs(out, exist_ok=True)
     rows: list[dict[str, str | int | float]] = []
     for model_name, expansion_factor, k in config:
-        repo_id = get_repo_id(model_name, expansion_factor, k, False, config.tuned_lens)
-        topk_in, topk_out = get_embed_cos_sim(config, repo_id, model_name)
+        repo_id = get_repo_id(
+            model_name=model_name,
+            expansion_factor=expansion_factor,
+            k=k,
+            tuned_lens=config.tuned_lens,
+            transformer=False,
+        )
+        topk_in, topk_out = get_similar_embeds(config, repo_id, model_name, device)
         n_latents = topk_in.shape[0]
         rows.append(
             {
@@ -92,4 +99,8 @@ if __name__ == "__main__":
                 "out_sem": topk_out.std().item() / np.sqrt(n_latents),
             }
         )
-    pd.DataFrame(rows).to_csv(os.path.join("out", "embed_cos_sim.csv"), index=False)
+    pd.DataFrame(rows).to_csv(os.path.join(out, config.filename), index=False)
+
+
+if __name__ == "__main__":
+    main(parse(Config), get_device())

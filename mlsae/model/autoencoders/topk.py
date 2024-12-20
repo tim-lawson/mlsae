@@ -2,69 +2,47 @@
 
 from typing import NamedTuple
 
-import einops
 import torch
 from huggingface_hub import PyTorchModelHubMixin
-from jaxtyping import Float
 from torch.nn import Linear, Module, Parameter
 
 from mlsae.model.decoder import decode
 from mlsae.model.types import Stats, TopK
+from mlsae.model_card import model_card_template
+
+from .utils import standardize, unit_norm_decoder
 
 
-class EncoderOutput(NamedTuple):
-    """The output of the encoder forward pass."""
-
-    topk: TopK
-    """The k largest latents."""
-
-    auxk: TopK | None
-    """If auxk is not None, the auxk largest dead latents."""
-
-    stats: Stats | None
-    """If normalize is True, the mean and standard deviation of the inputs."""
-
-    dead: Float[torch.Tensor, ""]
-    """The fraction of dead latents."""
-
-
-class AutoencoderOutput(NamedTuple):
+class TopKSAEOut(NamedTuple):
     """The output of the autoencoder forward pass."""
 
     topk: TopK
     """The k largest latents."""
 
-    recons: Float[torch.Tensor, "layer batch pos n_inputs"]
+    recons: torch.Tensor
     """The reconstructions from the k largest latents."""
 
     auxk: TopK | None
     """If auxk is not None, the auxk largest dead latents."""
 
-    auxk_recons: Float[torch.Tensor, "layer batch pos n_inputs"] | None
+    auxk_recons: torch.Tensor | None
     """If auxk is not None, the reconstructions from the auxk largest dead latents."""
 
-    dead: Float[torch.Tensor, ""]
+    dead: torch.Tensor
     """The fraction of dead latents."""
 
 
-class MLSAE(
+class TopKSAE(
     Module,
     PyTorchModelHubMixin,
-    repo_url="https://github.com/tim-lawson/mlsae",
+    model_card_template=model_card_template(False),
+    license="mit",
     language="en",
     library_name="mlsae",
-    license="mit",
+    repo_url="https://github.com/tim-lawson/mlsae",
+    tags=["arxiv:2409.04185"],
 ):
-    """
-    Multi-Layer Sparse Autoencoder (MLSAE) PyTorch module.
-
-    References:
-
-    - [Gao et al., 2024. Scaling and evaluating sparse autoencoders.](https://cdn.openai.com/papers/sparse-autoencoders.pdf)
-    - [Bricken et al., 2023. Towards Monosemanticity.](https://transformer-circuits.pub/2023/monosemantic-features)
-    """
-
-    last_nonzero: Float[torch.Tensor, "n_latents"]
+    last_nonzero: torch.Tensor
     """The number of steps since the latents have activated."""
 
     def __init__(
@@ -82,7 +60,7 @@ class MLSAE(
         Args:
             n_inputs (int): The number of inputs.
 
-            n_latents(int): The number of latents.
+            n_latents (int): The number of latents.
 
             k (int): The number of largest latents to keep.
 
@@ -119,8 +97,8 @@ class MLSAE(
         unit_norm_decoder(self.decoder)
 
     def encode(
-        self, inputs: Float[torch.Tensor, "layer batch pos n_inputs"]
-    ) -> EncoderOutput:
+        self, inputs: torch.Tensor
+    ) -> tuple[TopK, TopK | None, Stats | None, torch.Tensor]:
         stats = None
         if self.standardize:
             inputs, stats = standardize(inputs)
@@ -153,19 +131,15 @@ class MLSAE(
         if self.auxk is not None:
             auxk = TopK(*torch.topk(latents, k=self.auxk, sorted=False))
 
-        return EncoderOutput(topk, auxk, stats, dead)
+        return topk, auxk, stats, dead
 
-    def decode(
-        self, topk: TopK, stats: Stats | None = None
-    ) -> Float[torch.Tensor, "layer batch pos n_inputs"]:
+    def decode(self, topk: TopK, stats: Stats | None = None) -> torch.Tensor:
         recons = decode(topk, self.decoder.weight) + self.pre_encoder_bias
         if stats is not None:
             recons = recons * stats.std + stats.mean
         return recons
 
-    def forward(
-        self, inputs: Float[torch.Tensor, "layer batch pos n_inputs"]
-    ) -> AutoencoderOutput:
+    def forward(self, inputs: torch.Tensor) -> TopKSAEOut:
         topk, auxk, stats, dead = self.encode(inputs)
 
         # Apply ReLU to ensure the k largest latents are non-negative
@@ -173,50 +147,10 @@ class MLSAE(
         topk = TopK(values, topk.indices)
         recons = self.decode(topk, stats)
 
+        auxk_recons = None
         if auxk is not None:
             auxk_values = torch.relu(auxk.values)
             auxk = TopK(auxk_values, auxk.indices)
             auxk_recons = self.decode(auxk)
 
-        return AutoencoderOutput(topk, recons, auxk, auxk_recons, dead)
-
-
-def unit_norm_decoder(decoder: Linear) -> None:
-    """Unit-normalize the decoder weight vectors."""
-
-    decoder.weight.data /= decoder.weight.data.norm(dim=0)
-
-
-# TODO: Use kernels.triton_add_mul_ if it's available
-@torch.no_grad()
-def unit_norm_decoder_gradient(decoder: Linear) -> None:
-    """
-    Remove the component of the gradient parallel to the decoder weight vectors.
-    Assumes that the decoder weight vectors are unit-normalized.
-    NOTE: Without `@torch.no_grad()`, this causes a memory leak!
-    """
-
-    assert decoder.weight.grad is not None
-    scalar = einops.einsum(
-        decoder.weight.grad,
-        decoder.weight,
-        "... n_latents n_inputs, ... n_latents n_inputs -> ... n_inputs",
-    )
-    vector = einops.einsum(
-        scalar,
-        decoder.weight,
-        "... n_inputs, ... n_latents n_inputs -> ... n_latents n_inputs",
-    )
-    decoder.weight.grad -= vector
-
-
-def standardize(
-    x: Float[torch.Tensor, "... n_inputs"], eps: float = 1e-5
-) -> tuple[Float[torch.Tensor, "... n_inputs"], Stats]:
-    """Standardize the inputs to zero mean and unit variance."""
-
-    mu = x.mean(dim=-1, keepdim=True)
-    x = x - mu
-    std = x.std(dim=-1, keepdim=True)
-    x = x / (std + eps)
-    return x, Stats(mu, std)
+        return TopKSAEOut(topk, recons, auxk, auxk_recons, dead)

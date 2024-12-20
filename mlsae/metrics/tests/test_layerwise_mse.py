@@ -39,6 +39,13 @@ shape = (n_layers, 1, 2048, 512)
             torch.ones(n_layers),
             id="1 and 0",
         ),
+        pytest.param(
+            1,
+            torch.ones((1, *shape[1:])),
+            torch.zeros((1, *shape[1:])),
+            torch.ones(1),
+            id="single layer",
+        ),
     ],
 )
 def test_layerwise_mse(

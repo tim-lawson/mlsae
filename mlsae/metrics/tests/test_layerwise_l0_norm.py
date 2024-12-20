@@ -32,6 +32,13 @@ shape = (n_layers, 1, 2048, 32)
             torch.ones(n_layers) * 32.0,
             id="above threshold",
         ),
+        pytest.param(
+            1,
+            1e-3,
+            torch.ones((1, *shape[1:])),
+            torch.ones(1) * 32.0,
+            id="single layer",
+        ),
     ],
 )
 def test_layerwise_l0_norm(

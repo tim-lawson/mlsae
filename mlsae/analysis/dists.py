@@ -7,7 +7,6 @@ import numpy as np
 import pandas as pd
 import torch
 from datasets import Dataset, DatasetDict, load_dataset
-from loguru import logger
 from safetensors.torch import load_file, save_file
 from simple_parsing import Serializable, field, parse
 from tqdm import tqdm
@@ -34,7 +33,7 @@ class Config(Serializable):
     log_every_n_steps: int | None = 8
     """The number of steps between logging statistics."""
 
-    push_to_hub: bool = False
+    push_to_hub: bool = True
     """Whether to push the dataset to HuggingFace."""
 
 
@@ -91,7 +90,7 @@ def get_tensors(
 
     for i, batch in enumerate(tqdm(dataloader, total=config.data.max_steps)):
         inputs = model.transformer.forward(batch["input_ids"].to(device))
-        topk = model.autoencoder.encode(inputs).topk
+        topk, auxk, stats, dead = model.autoencoder.encode(inputs)
         metric.update(topk)
 
         if config.log_every_n_steps is not None and i % config.log_every_n_steps == 0:
@@ -159,6 +158,10 @@ class Dists:
     @cached_property
     def probs(self) -> torch.Tensor:
         return self.totals / self.totals.sum(0)  # n_layers n_latents
+
+    @cached_property
+    def entropies(self) -> torch.Tensor:
+        return -(self.probs * self.probs.log()).sum(0)  # n_latents
 
     @cached_property
     def layer_mean(self) -> torch.Tensor:
@@ -233,7 +236,6 @@ class Dists:
     @staticmethod
     def repo_id(repo_id: str) -> str:
         if repo_id.endswith("-dists"):
-            logger.warning(f"repo_id {repo_id} already ends with '-dists'")
             return repo_id
         if repo_id.endswith("-tfm"):
             return repo_id.replace("-tfm", "-dists")
@@ -247,7 +249,9 @@ class Dists:
         )
 
 
-def save_dists(config: Config, device: torch.device | str = "cpu") -> None:
+def main(config: Config, device: torch.device | str = "cpu") -> None:
+    initialize(config.seed)
+
     tensors = get_tensors(config, device)
     repo_id = Dists.repo_id(config.repo_id)
     filename = Dists.filename(repo_id)
@@ -265,7 +269,4 @@ def save_dists(config: Config, device: torch.device | str = "cpu") -> None:
 
 
 if __name__ == "__main__":
-    device = get_device()
-    config = parse(Config)
-    initialize(config.seed)
-    save_dists(config, device)
+    main(parse(Config), get_device())

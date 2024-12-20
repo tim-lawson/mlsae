@@ -1,42 +1,46 @@
-[tool.poetry]
+[project]
 name = "mlsae"
-version = "0.1.0"
+version = "0.2.0"
 description = "Multi-Layer Sparse Autoencoders"
-authors = ["Tim Lawson <hello@timlawson.dev>"]
+authors = [{ name = "Tim Lawson", email = "hello@timlawson.dev" }]
 readme = "README.md"
-
-[tool.poetry.dependencies]
-datasets = "^2.20.0"
-einops = "^0.8.0"
-fastapi = "^0.111.1"
-huggingface-hub = {extras = ["cli"], version = "^0.24.6"}
-jaxtyping = "^0.2.33"
-lightning = "^2.3.3"
-loguru = "^0.7.2"
-matplotlib = "^3.9.1"
-orjson = "^3.10.6"
-pydantic = "^2.8.2"
-pytest = "^8.3.2"
-python = "^3.12"
-simple-parsing = "^0.1.5"
-torch = "^2.4.0"
-transformers = "^4.42.4"
-triton = { version = "^3.0.0", optional = true }
-uvicorn = { extras = ["standard"], version = "^0.30.3" }
-wandb = "^0.17.4"
-zstandard = "^0.23.0"
-tuned-lens = "^0.2.0"
-
-[tool.poetry.extras]
-triton = ["triton"]
-
-[tool.poetry.group.dev.dependencies]
-ruff = "^0.5.2"
+requires-python = ">=3.12"
+dependencies = [
+    "datasets>=3.1.0",
+    "diptest>=0.8.2",
+    "einops>=0.8.0",
+    "fastapi>=0.115.5",
+    "huggingface-hub[cli]>=0.26.2",
+    "jaxtyping>=0.2.34",
+    "lightning>=2.4.0",
+    "loguru>=0.7.2",
+    "matplotlib>=3.9.2",
+    "natsort>=8.4.0",
+    "numpy>=2.1.3",
+    "orjson>=3.10.11",
+    "pandas>=2.2.3",
+    "pydantic>=2.9.2",
+    "pytest>=8.3.3",
+    "ruff>=0.7.3",
+    "safetensors>=0.4.5",
+    "scipy>=1.14.1",
+    "simple-parsing>=0.1.6",
+    "torch>=2.5.1",
+    "torchmetrics>=1.6.0",
+    "tqdm>=4.67.0",
+    "transformers>=4.46.2",
+    "triton>=3.1.0",
+    "tuned-lens>=0.2.0",
+    "uvicorn[standard]>=0.32.0",
+    "wandb>=0.18.7",
+    "zstandard>=0.23.0",
+]
 
 [tool.pytest.ini_options]
 minversion = "6.0"
-addopts = "-ra -q"
-testpaths = ["tests"]
+addopts = "-ra -q --import-mode=importlib -m='not slow'"
+markers = ["slow: mark test as slow to run"]
+testpaths = ["mlsae"]
 
 [tool.ruff]
 extend-include = ["*.ipynb"]
@@ -45,7 +49,8 @@ target-version = "py312"
 [tool.ruff.lint]
 ignore = ["F722", "F821", "UP037"]
 select = ["E", "F", "UP", "B", "SIM", "I"]
+unfixable = ["F401"]
 
-[build-system]
-build-backend = "poetry.core.masonry.api"
-requires = ["poetry-core"]
+[tool.setuptools.packages.find]
+include = ["mlsae", "figures"]
+namespaces = false

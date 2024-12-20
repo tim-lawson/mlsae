@@ -17,21 +17,24 @@ from mlsae.metrics import (
     DeadLatents,
     LayerwiseFVU,
     LayerwiseL1Norm,
-    LayerwiseLogitKLDiv,
-    LayerwiseLogitMSE,
+    # LayerwiseLogitKLDiv,
+    # LayerwiseLogitMSE,
     LayerwiseLossDelta,
     LayerwiseMSE,
     LayerwiseWrapper,
     MSELoss,
 )
-from mlsae.model.autoencoder import (
-    MLSAE,
-    AutoencoderOutput,
+from mlsae.model.autoencoders import (
+    TopKSAE,
+    TopKSAEOut,
     unit_norm_decoder,
     unit_norm_decoder_gradient,
 )
 from mlsae.model.geom_median import geometric_median
-from mlsae.model.transformer import Transformer
+from mlsae.model.transformers import GPT2Transformer, PythiaTransformer
+from mlsae.model.transformers.gemma2 import GemmaTransformer
+from mlsae.model.transformers.llama import LlamaTransformer
+from mlsae.model_card import model_card_template
 
 
 @dataclass
@@ -41,7 +44,7 @@ class MLSAEConfig(Serializable):
     dead_tokens_threshold: int = 10_000_000
     """The number of tokens after which a latent is flagged as dead during training."""
 
-    expansion_factor: int = 16
+    expansion_factor: int = 64
     """The ratio of the number of latents to the number of inputs."""
 
     k: int = 32
@@ -92,10 +95,12 @@ def create_untransform_hidden(tuned_lens: TunedLens):
 class MLSAETransformer(
     LightningModule,
     PyTorchModelHubMixin,
-    repo_url="https://github.com/tim-lawson/mlsae",
+    model_card_template=model_card_template(True),
+    license="mit",
     language="en",
     library_name="mlsae",
-    license="mit",
+    repo_url="https://github.com/tim-lawson/mlsae",
+    tags=["arxiv:2409.04185"],
 ):
     loss_true: Float[torch.Tensor, "n_layers"]
     loss_pred: Float[torch.Tensor, "n_layers"]
@@ -105,7 +110,6 @@ class MLSAETransformer(
     def __init__(
         self,
         model_name: str = "EleutherAI/pythia-70m-deduped",
-        # TODO: Check this works for non-consecutive layers
         layers: list[int] | None = None,
         expansion_factor: int = 16,
         k: int = 32,
@@ -133,7 +137,7 @@ class MLSAETransformer(
         - [Bricken et al., 2023. Towards Monosemanticity.](https://transformer-circuits.pub/2023/monosemantic-features)
 
         Args:
-            model_name (str): The name of a pretrained GPTNeoXForCausalLM model.
+            model_name (str): The name of a pretrained model.
 
             layers (list[int] | None): The layers to train on.
                 If None, all layers are trained on. Defaults to None.
@@ -196,14 +200,25 @@ class MLSAETransformer(
             // (self.batch_size * self.max_length * self.accumulate_grad_batches)
         )
 
-        self.transformer = Transformer(
-            self.model_name,
-            self.max_length,
-            self.batch_size,
-            self.skip_special_tokens,
-            layers=layers,
-            device=self.device,
-        )
+        transformer_kwargs = {
+            "model_name": self.model_name,
+            "max_length": self.max_length,
+            "batch_size": self.batch_size,
+            "skip_special_tokens": self.skip_special_tokens,
+            "layers": layers,
+            "device": self.device,
+        }
+        # TODO: Improve this...
+        if "pythia" in model_name:
+            self.transformer = PythiaTransformer(**transformer_kwargs)
+        elif "gpt2" in model_name:
+            self.transformer = GPT2Transformer(**transformer_kwargs)
+        elif "llama" in model_name:
+            self.transformer = LlamaTransformer(**transformer_kwargs)
+        elif "gemma" in model_name:
+            self.transformer = GemmaTransformer(**transformer_kwargs)
+        else:
+            raise ValueError(f"Unknown model name: {model_name}")
         self.transformer.eval()
         self.transformer.requires_grad_(False)
 
@@ -214,7 +229,7 @@ class MLSAETransformer(
 
         self.save_hyperparameters(ignore=["autoencoder", "transformer"])
 
-        self.autoencoder: MLSAE = MLSAE(
+        self.autoencoder: TopKSAE = TopKSAE(
             self.n_inputs,
             self.n_latents,
             self.k,
@@ -257,32 +272,32 @@ class MLSAETransformer(
                 "loss/delta": wrap(
                     LayerwiseLossDelta(self.n_layers), prefix="loss/delta/"
                 ),
-                "logit/mse": wrap(
-                    LayerwiseLogitMSE(self.n_layers), prefix="logit/mse/"
-                ),
-                "logit/kldiv": wrap(
-                    LayerwiseLogitKLDiv(self.n_layers), prefix="logit/kldiv/"
-                ),
+                # "logit/mse": wrap(
+                #     LayerwiseLogitMSE(self.n_layers), prefix="logit/mse/"
+                # ),
+                # "logit/kldiv": wrap(
+                #     LayerwiseLogitKLDiv(self.n_layers), prefix="logit/kldiv/"
+                # ),
             },
             prefix="val/",
         )
 
-        logits = (
-            self.n_layers,
-            self.transformer.batch_size,
-            self.transformer.max_length,
-            self.transformer.config.vocab_size,
-        )
+        # logits = (
+        #     self.n_layers,
+        #     self.transformer.batch_size,
+        #     self.transformer.max_length,
+        #     self.transformer.config.vocab_size,
+        # )
         self.register_buffer("loss_true", torch.zeros(self.n_layers))
         self.register_buffer("loss_pred", torch.zeros(self.n_layers))
-        self.register_buffer("logits_true", torch.zeros(logits))
-        self.register_buffer("logits_pred", torch.zeros(logits))
+        # self.register_buffer("logits_true", torch.zeros(logits))
+        # self.register_buffer("logits_pred", torch.zeros(logits))
 
-    def forward(self, tokens: Int[torch.Tensor, "batch pos"]) -> AutoencoderOutput:
+    def forward(self, tokens: Int[torch.Tensor, "batch pos"]) -> TopKSAEOut:
         inputs = self.forward_lens(self.transformer.forward(tokens))
         topk, recons, auxk, auxk_recons, dead = self.autoencoder.forward(inputs)
         recons = self.inverse_lens(recons)
-        return AutoencoderOutput(topk, recons, auxk, auxk_recons, dead)
+        return TopKSAEOut(topk, recons, auxk, auxk_recons, dead)
 
     def forward_lens(
         self, inputs: Float[torch.Tensor, "layer batch pos n_inputs"]
@@ -346,17 +361,17 @@ class MLSAETransformer(
         tokens: Int[torch.Tensor, "batch pos"],
     ) -> None:
         for layer in range(self.n_layers):
-            loss, logits = self.transformer.forward_at_layer(
-                inputs, layer, return_type="both", tokens=tokens
+            loss = self.transformer.forward_at_layer(
+                inputs, layer, return_type="loss", tokens=tokens
             )
             self.loss_true[layer] = loss
-            self.logits_true[layer] = logits
+            # self.logits_true[layer] = logits
 
-            loss, logits = self.transformer.forward_at_layer(
-                recons, layer, return_type="both", tokens=tokens
+            loss = self.transformer.forward_at_layer(
+                recons, layer, return_type="loss", tokens=tokens
             )
             self.loss_pred[layer] = loss
-            self.logits_pred[layer] = logits
+            # self.logits_pred[layer] = logits
 
     @torch.no_grad()
     def validation_step(self, batch: dict[str, Int[torch.Tensor, "batch pos"]]) -> None:
@@ -369,8 +384,8 @@ class MLSAETransformer(
         val_metrics = self.val_metrics.forward(
             loss_true=self.loss_true,
             loss_pred=self.loss_pred,
-            logits_true=self.logits_true,
-            logits_pred=self.logits_pred,
+            # logits_true=self.logits_true,
+            # logits_pred=self.logits_pred,
         )
 
         self.log_dict(val_metrics)
@@ -395,8 +410,8 @@ class MLSAETransformer(
         val_metrics = self.val_metrics.forward(
             loss_true=self.loss_true,
             loss_pred=self.loss_pred,
-            logits_true=self.logits_true,
-            logits_pred=self.logits_pred,
+            # logits_true=self.logits_true,
+            # logits_pred=self.logits_pred,
         )
 
         mse_loss = self.mse_loss.forward(inputs=inputs, recons=recons)
@@ -422,8 +437,8 @@ class MLSAETransformer(
     def on_train_end(self) -> None:
         del self.loss_true
         del self.loss_pred
-        del self.logits_true
-        del self.logits_pred
+        # del self.logits_true
+        # del self.logits_pred
         del self.autoencoder.last_nonzero
 
     def configure_optimizers(self):

@@ -14,8 +14,7 @@ from loguru import logger
 from simple_parsing import Serializable, field, parse
 from tqdm import tqdm
 
-from mlsae.model import DataConfig, MLSAETransformer
-from mlsae.model.data import get_train_dataloader
+from mlsae.model import DataConfig, MLSAETransformer, get_train_dataloader
 from mlsae.trainer import initialize
 from mlsae.utils import get_device
 
@@ -151,7 +150,7 @@ def get_examples(
 ) -> Generator[Example, None, None]:
     batch_tokens = batch["input_ids"].to(device)
     inputs = model.transformer.forward(batch_tokens)
-    topk = model.autoencoder.encode(inputs).topk
+    topk, auxk, stats, dead = model.autoencoder.encode(inputs)
 
     batch_tokens = einops.rearrange(batch_tokens, "b s -> (b s)")
     batch_acts = einops.rearrange(topk.values, "l b s k -> l (b s) k").half()

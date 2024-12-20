@@ -12,13 +12,28 @@ shape = (n_layers, 1, 2048, 32)
     ("n_layers", "values", "expected"),
     [
         pytest.param(
-            n_layers, torch.zeros(*shape), torch.zeros(n_layers), id="all zero"
+            n_layers,
+            torch.zeros(*shape),
+            torch.zeros(n_layers),
+            id="all zero",
         ),
         pytest.param(
-            n_layers, torch.ones(*shape), torch.ones(n_layers) * 32.0, id="all +1"
+            n_layers,
+            torch.ones(*shape),
+            torch.ones(n_layers) * 32.0,
+            id="all +1",
         ),
         pytest.param(
-            n_layers, torch.ones(*shape) * -1, torch.ones(n_layers) * 32.0, id="all -1"
+            n_layers,
+            torch.ones(*shape) * -1,
+            torch.ones(n_layers) * 32.0,
+            id="all -1",
+        ),
+        pytest.param(
+            1,
+            torch.ones((1, *shape[1:])) * -1,
+            torch.ones(1) * 32.0,
+            id="single layer",
         ),
     ],
 )

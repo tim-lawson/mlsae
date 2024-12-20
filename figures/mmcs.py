@@ -6,8 +6,8 @@ import torch
 from simple_parsing import parse
 from tqdm import tqdm
 
-from mlsae.model import MLSAE
-from mlsae.trainer import SweepConfig, initialize
+from mlsae.model import MLSAETransformer
+from mlsae.trainer import SweepConfig
 from mlsae.utils import get_device, get_repo_id, normalize
 
 
@@ -27,8 +27,14 @@ def get_max_cos_sim(
     chunk_size: int = 1024,
     device: torch.device | str = "cpu",
 ) -> tuple[torch.Tensor, int]:
-    repo_id = get_repo_id(model_name, expansion_factor, k, False, tuned_lens)
-    mlsae = MLSAE.from_pretrained(repo_id).to(device)
+    repo_id = get_repo_id(
+        model_name=model_name,
+        expansion_factor=expansion_factor,
+        k=k,
+        tuned_lens=tuned_lens,
+        transformer=True,
+    )
+    mlsae = MLSAETransformer.from_pretrained(repo_id).to(device).autoencoder
     W_dec = normalize(mlsae.decoder.weight.detach())
 
     _, n_latents = W_dec.shape
@@ -54,15 +60,18 @@ def get_max_cos_sim(
     return max_cos_sim.cpu(), mlsae.n_latents
 
 
-if __name__ == "__main__":
-    device = get_device()
-    config = parse(Config)
-    initialize(config.seed)
-
+def main(
+    config: Config, device: torch.device, out: str | os.PathLike[str] = ".out"
+) -> None:
+    os.makedirs(out, exist_ok=True)
     rows: list[dict[str, str | int | float]] = []
     for model_name, expansion_factor, k in config:
         max_cos_sim, n_latents = get_max_cos_sim(
-            model_name, expansion_factor, k, config.tuned_lens, device=device
+            model_name=model_name,
+            expansion_factor=expansion_factor,
+            k=k,
+            tuned_lens=config.tuned_lens,
+            device=device,
         )
         rows.append(
             {
@@ -77,4 +86,8 @@ if __name__ == "__main__":
                 "sem": max_cos_sim.std().item() / max_cos_sim.size(0) ** 0.5,
             }
         )
-    pd.DataFrame(rows).to_csv(os.path.join("out", config.filename), index=False)
+    pd.DataFrame(rows).to_csv(os.path.join(out, config.filename), index=False)
+
+
+if __name__ == "__main__":
+    main(parse(Config), get_device())

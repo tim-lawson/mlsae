@@ -1,6 +1,6 @@
 import torch
 from matplotlib import pyplot as plt
-from matplotlib.colors import Colormap
+from matplotlib.colors import Colormap, Normalize
 
 
 def save_heatmap(
@@ -9,6 +9,7 @@ def save_heatmap(
     figsize: tuple[float, float] = (5.5, 1.25),
     dpi: int = 1200,
     cmap: str | Colormap | None = "magma_r",
+    norm: str | Normalize | None = None,
 ) -> None:
     # Exclude latents with only NaN values
     data = data[:, ~torch.all(data.isnan(), dim=0)]
@@ -18,7 +19,15 @@ def save_heatmap(
 
     plt.rcParams.update({"axes.linewidth": 0})
     fig, ax = plt.subplots(1, 1, figsize=figsize, dpi=dpi)
-    ax.imshow(data, cmap=cmap, aspect="auto", extent=extent, interpolation="nearest")
+
+    ax.imshow(
+        data,
+        cmap=cmap,
+        norm=norm,
+        aspect="auto",
+        extent=extent,
+        interpolation="nearest",
+    )
     ax.set_axis_off()
 
     fig.savefig(filename, format="pdf", bbox_inches="tight", pad_inches=0)
