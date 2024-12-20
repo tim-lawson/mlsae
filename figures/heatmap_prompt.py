@@ -1,7 +1,6 @@
 import os
 from dataclasses import dataclass
 
-import pandas as pd
 import torch
 from matplotlib.colors import PowerNorm
 from simple_parsing import parse
@@ -25,6 +24,7 @@ class Config(SweepConfig):
     """Whether to plot counts, totals, or probabilities."""
 
     gamma: float = 0.5
+    """Gamma value for PowerNorm. Only applies to counts and totals."""
 
 
 @torch.no_grad()

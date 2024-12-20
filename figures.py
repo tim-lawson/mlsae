@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from simple_parsing import Serializable, parse
 
 from figures import (
-    bimodality,
     embed_sim,
     entropy,
     heatmap_aggregate,
@@ -14,7 +13,7 @@ from figures import (
     layer_std,
     mmcs,
     num_layers,
-    temp_scatter,
+    scatter_freq,
     wdec_sim,
 )
 from mlsae.trainer import SweepConfig
@@ -46,19 +45,20 @@ class FigureConfig(Serializable):
     out: str = ".out"
     """The directory to save the results to."""
 
+    # in the paper
     heatmap_aggregate: bool = False
     heatmap_prompt: bool = False
     mmcs: bool = False
     wdec_sim: bool = False
     num_layers: bool = False
     entropy: bool = False
-    bimodality: bool = False
 
+    # not in the paper
     embed_sim: bool = False
     layer_std: bool = False
     layer_hist: bool = False
     layer_sim: bool = False
-    heatmap_freq: bool = False
+    scatter_freq: bool = False
 
 
 def main(config: FigureConfig, sweeps: list[FigureSweep]) -> None:
@@ -109,7 +109,7 @@ def main(config: FigureConfig, sweeps: list[FigureSweep]) -> None:
 
         if config.num_layers:
             print("> num_layers")
-            threshold = 1000000
+            threshold = 1_000_000
             num_layers_config = num_layers.Config(
                 **sweep_dict,
                 filename=f"num_layers_{id}_{threshold}.csv",
@@ -123,15 +123,6 @@ def main(config: FigureConfig, sweeps: list[FigureSweep]) -> None:
             print("> entropy")
             entropy_config = entropy.Config(**sweep_dict, filename=f"entropy_{id}.csv")
             entropy.main(entropy_config, device, os.path.join(config.out, "entropy"))
-
-        if config.bimodality:
-            print("> bimodality")
-            bimodality_config = bimodality.Config(
-                **sweep_dict, filename=f"bimodality_{id}.csv"
-            )
-            bimodality.main(
-                bimodality_config, device, os.path.join(config.out, "bimodality")
-            )
 
         if config.embed_sim:
             print("> embed_sim")
@@ -162,9 +153,9 @@ def main(config: FigureConfig, sweeps: list[FigureSweep]) -> None:
             print("> layer_sim")
             layer_sim.main(sweep, device, os.path.join(config.out, "layer_sim"))
 
-        if config.heatmap_freq:
-            print("> heatmap_freq")
-            temp_scatter.main(sweep, device, os.path.join(config.out, "heatmap_freq"))
+        if config.scatter_freq:
+            print("> scatter_freq")
+            scatter_freq.main(sweep, device, os.path.join(config.out, "scatter_freq"))
 
 
 sweeps: list[FigureSweep] = [

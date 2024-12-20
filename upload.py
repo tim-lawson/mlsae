@@ -75,14 +75,6 @@ def upload_models(ckpt_path: str, dry_run: bool) -> None:
 if __name__ == "__main__":
     dry_run = False
 
-    # for path in [
-    #     "wandb_logs/lightning_logs/fqqnmq6p/checkpoints/epoch=0-step=2368.ckpt",
-    #     "wandb_logs/lightning_logs/zabxb19f/checkpoints/epoch=0-step=3200.ckpt",
-    # ]:
-    #     upload_models(path)
-
-    # raise SystemExit
-
     for path in find_ckpt_paths(step=7616):
         upload_models(path, dry_run)
 

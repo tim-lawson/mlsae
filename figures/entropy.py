@@ -48,9 +48,8 @@ def main(
             }
         )
 
-        values = values.cpu().numpy()
         hist, bins = numpy.histogram(
-            values,
+            values.cpu().numpy(),
             bins=dists.n_latents // expansion_factor,
             range=(0, math.log(dists.n_layers)),
         )

@@ -17,6 +17,7 @@ class Config(SweepConfig):
     """Whether to plot counts, totals, or probabilities."""
 
     gamma: float = 0.5
+    """Gamma value for PowerNorm. Only applies to counts and totals."""
 
 
 def get_heatmap_data(dists: Dists, mode: str) -> torch.Tensor:
