@@ -11,7 +11,6 @@ from mlsae.trainer import RunConfig, initialize
 from mlsae.utils import (
     forward_single_layer,
     get_device,
-    get_model_repo_id,
     get_repo_id,
     load_single_layer,
 )
@@ -100,21 +99,13 @@ def test_manual(
 
 
 def main() -> None:
-    for model_name, layer, tuned_lens in [
-        (pythia_70m, 5, False),
-        (pythia_160m, 11, False),
-        (pythia_70m, 0, True),
-        (pythia_70m, 1, True),
-        (pythia_70m, 2, True),
-        (pythia_70m, 3, True),
-        (pythia_70m, 4, True),
-        (pythia_70m, 5, True),
-    ]:
-        test(model_name, layer, tuned_lens)
+    for model_name in [pythia_70m, pythia_160m]:
+        for layer in layers[model_name]:
+            test(model_name, layer, False)
 
-    # for model_name in [pythia_70m, pythia_160m]:
-    #     for layer in layers[model_name]:
-    #         test(model_name, layer)
+    for model_name in [pythia_70m]:
+        for layer in layers[model_name]:
+            test(model_name, layer, True)
 
 
 if __name__ == "__main__":

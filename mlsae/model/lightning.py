@@ -137,8 +137,7 @@ class MLSAETransformer(
         - [Bricken et al., 2023. Towards Monosemanticity.](https://transformer-circuits.pub/2023/monosemantic-features)
 
         Args:
-            model_name (str): The name of a pretrained GPTNeoXForCausalLM or
-                GPT2LMHeadModel model.
+            model_name (str): The name of a pretrained model.
 
             layers (list[int] | None): The layers to train on.
                 If None, all layers are trained on. Defaults to None.
