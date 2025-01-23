@@ -1,13 +1,3 @@
 {
-  "recommendations": [
-    "bradlc.vscode-tailwindcss",
-    "charliermarsh.ruff",
-    "dbaeumer.vscode-eslint",
-    "esbenp.prettier-vscode",
-    "foxundermoon.shell-format",
-    "ms-python.python",
-    "redhat.vscode-yaml",
-    "tamasfe.even-better-toml",
-    "ms-vscode.vscode-typescript-next"
-  ]
+  "recommendations": ["charliermarsh.ruff", "ms-python.python"]
 }
