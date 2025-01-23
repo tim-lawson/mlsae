@@ -1,4 +1,4 @@
-# TODO: tidy this up
+# TODO: tidy this up!
 
 import os
 import re
@@ -9,7 +9,7 @@ from natsort import natsorted
 
 def parse_mlsae_repo_id(repo_id: str) -> tuple[str, int, int, bool]:
     split = repo_id.split("-")
-    if split[1] == "pythia":
+    if split[1] == "pythia" or split[1] == "gemma" or split[1] == "Llama":
         model_name = split[1] + "-" + split[2] + "-" + split[3]
         expansion_factor = int(split[4].lstrip("x"))
         k = int(split[5].lstrip("k"))
@@ -122,6 +122,7 @@ if __name__ == "__main__":
 
     is_70m = df["model_name"] == "pythia-70m-deduped"
     is_160m = df["model_name"] == "pythia-160m-deduped"
+    is_410m = df["model_name"] == "pythia-410m-deduped"
     is_x64 = df["expansion_factor"] == 64
     is_k32 = df["k"] == 32
     is_tuned_lens = df["tuned_lens"]
@@ -216,6 +217,25 @@ if __name__ == "__main__":
         df[is_160m & is_x64 & is_k32 & ~is_tuned_lens],
         "out/test_pythia-160m-deduped_layer_kl_div.csv",
         pattern=r"val/logit/kldiv/layer_\d+",
+    )
+
+    df[is_410m & is_layer & ~is_tuned_lens].to_csv(
+        "out/test_pythia-410m-deduped_layer.csv", index=False
+    )
+    matrix_plot(
+        df[is_410m & is_x64 & is_k32 & ~is_tuned_lens],
+        "out/test_pythia-410m-deduped_layer_fvu.csv",
+        pattern=r"train/fvu/layer_\d+",
+    )
+    matrix_plot(
+        df[is_410m & is_x64 & is_k32 & ~is_tuned_lens],
+        "out/test_pythia-410m-deduped_layer_mse.csv",
+        pattern=r"train/mse/layer_\d+",
+    )
+    matrix_plot(
+        df[is_410m & is_x64 & is_k32 & ~is_tuned_lens],
+        "out/test_pythia-410m-deduped_layer_loss_delta.csv",
+        pattern=r"val/loss/delta/layer_\d+",
     )
 
     df = df[
