@@ -39,7 +39,7 @@ class Config(Serializable):
 
 class Metric:
     def __init__(
-        self, n_layers: int, n_latents: int, device: torch.device | str = "cpu"
+        self, n_layers: int, n_latents: int, device: torch.device | str
     ) -> None:
         self.n_layers = n_layers
         self.n_latents = n_latents
@@ -72,9 +72,7 @@ def get_stats(layer_std: torch.Tensor) -> dict[str, float]:
 
 
 @torch.no_grad()
-def get_tensors(
-    config: Config, device: torch.device | str = "cpu"
-) -> dict[str, torch.Tensor]:
+def get_tensors(config: Config, device: torch.device | str) -> dict[str, torch.Tensor]:
     model = MLSAETransformer.from_pretrained(config.repo_id).to(device)
 
     dataloader = get_test_dataloader(
@@ -202,20 +200,18 @@ class Dists:
 
     @staticmethod
     def from_tensors(
-        tensors: dict[str, torch.Tensor], device: torch.device | str | int = "cpu"
+        tensors: dict[str, torch.Tensor], device: torch.device | str | int
     ) -> "Dists":
         return Dists(tensors=tensors, device=device)
 
     @staticmethod
     def from_file(
-        filename: str | os.PathLike[str], device: torch.device | str | int = "cpu"
+        filename: str | os.PathLike[str], device: torch.device | str | int
     ) -> "Dists":
         return Dists(filename=filename, device=device)
 
     @staticmethod
-    def from_dataset(
-        dataset: Dataset, device: torch.device | str | int = "cpu"
-    ) -> "Dists":
+    def from_dataset(dataset: Dataset, device: torch.device | str | int) -> "Dists":
         n_layers, n_latents = len(dataset["counts"][0]), len(dataset["counts"])
         tensors = {
             "counts": torch.zeros((n_layers, n_latents), device=device),
@@ -228,7 +224,7 @@ class Dists:
         return Dists(tensors=tensors, device=device)
 
     @staticmethod
-    def from_hub(repo_id: str, device: torch.device | str | int = "cpu") -> "Dists":
+    def from_hub(repo_id: str, device: torch.device | str | int) -> "Dists":
         dataset = load_dataset(Dists.repo_id(repo_id))
         assert isinstance(dataset, DatasetDict)
         return Dists.from_dataset(dataset["train"], device)
@@ -249,7 +245,7 @@ class Dists:
         )
 
 
-def main(config: Config, device: torch.device | str = "cpu") -> None:
+def main(config: Config, device: torch.device | str) -> None:
     initialize(config.seed)
 
     tensors = get_tensors(config, device)
@@ -261,7 +257,7 @@ def main(config: Config, device: torch.device | str = "cpu") -> None:
     _test = Dists.from_file(filename, device)
 
     if config.push_to_hub:
-        dataset = Dataset.from_generator(Dists(tensors).__iter__)
+        dataset = Dataset.from_generator(Dists(tensors, filename, device).__iter__)
         assert isinstance(dataset, Dataset)
         dataset.push_to_hub(repo_id, commit_description=config.dumps_json())
         _test = Dists.from_dataset(dataset, device)

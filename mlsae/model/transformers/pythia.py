@@ -297,11 +297,11 @@ class PythiaTransformer(Module):
         if tokens.shape != (self.batch_size, self.max_length):
             return GPTNeoXModel._prepare_4d_causal_attention_mask_with_cache_position(
                 attention_mask=None,  # type: ignore
-                sequence_length=self.max_length,
-                target_length=self.max_length,
+                sequence_length=tokens.size(1),
+                target_length=tokens.size(1),
                 dtype=torch.float32,
-                device=tokens.device or torch.device("cpu"),
-                cache_position=torch.tensor(0),
+                device=tokens.device,
+                cache_position=torch.tensor(0, device=tokens.device),
                 batch_size=self.batch_size,
             )
 
