@@ -245,7 +245,7 @@ if __name__ == "__main__":
             "train/mse/avg",
             "train/l1/avg",
             "val/loss/delta/avg",
-            "val/logit/kldiv/avg",
+            # "val/logit/kldiv/avg",
         ]
     ]
     df["model_name"] = (
@@ -253,6 +253,10 @@ if __name__ == "__main__":
         .str.replace("pythia", "Pythia")
         .str.replace("-deduped", "")
         .str.replace("gpt2", "GPT-2 small")
+        .str.replace("google/", "")
+        .str.replace("gemma-2-2b", "Gemma 2 2B")
+        .str.replace("meta-llama/", "")
+        .str.replace("Llama-3.2-3B", "Llama 3.2 3B")
     )
     df["model_name"] = pd.Categorical(
         df["model_name"],
@@ -263,6 +267,8 @@ if __name__ == "__main__":
             "Pythia-1b",
             "Pythia-1.4b",
             "GPT-2 small",
+            "Gemma 2 2B",
+            "Llama 3.2 3B",
         ],
     )
     df = df.rename(
@@ -272,13 +278,17 @@ if __name__ == "__main__":
             "train/mse/avg": "MSE",
             "train/l1/avg": "L1 Norm",
             "val/loss/delta/avg": "Delta CE Loss",
-            "val/logit/kldiv/avg": "KL Divergence",
+            # "val/logit/kldiv/avg": "KL Divergence",
         }
     )
-    is_14b = df["Model"] == "Pythia-1.4b"
-    df[~is_14b & is_x64 & is_k32 & ~is_tuned_lens & ~is_layer].transpose().to_csv(
-        "out/test_model_name.csv", header=False, index=True
+    # is_14b = df["Model"] == "Pythia-1.4b"
+    df[is_x64 & is_k32 & ~is_tuned_lens & ~is_layer].to_csv(
+        "out/test_model_name.csv",
+        header=True,
+        index=False,
     )
-    df[~is_14b & is_x64 & is_k32 & is_tuned_lens & ~is_layer].transpose().to_csv(
-        "out/test_lens_model_name.csv", header=False, index=True
+    df[is_x64 & is_k32 & is_tuned_lens & ~is_layer].to_csv(
+        "out/test_lens_model_name.csv",
+        header=True,
+        index=False,
     )
