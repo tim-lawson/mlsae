@@ -23,6 +23,7 @@ pythia_70m = "EleutherAI/pythia-70m-deduped"
 pythia_160m = "EleutherAI/pythia-160m-deduped"
 pythia_410m = "EleutherAI/pythia-410m-deduped"
 pythia_1b = "EleutherAI/pythia-1b-deduped"
+pythia_1_4b = "EleutherAI/pythia-1.4b-deduped"
 gpt2_small = "openai-community/gpt2"
 llama_3b = "meta-llama/Llama-3.2-3B"
 gemma_2b = "google/gemma-2-2b"
@@ -109,15 +110,15 @@ def main(config: FigureConfig, sweeps: list[FigureSweep]) -> None:
 
         if config.num_layers:
             print("> num_layers")
-            threshold = 1_000_000
-            num_layers_config = num_layers.Config(
-                **sweep_dict,
-                filename=f"num_layers_{id}_{threshold}.csv",
-                threshold=threshold,
-            )
-            num_layers.main(
-                num_layers_config, device, os.path.join(config.out, "num_layers")
-            )
+            for threshold in [1, 10, 100, 1000, 10000, 100000, 1000000]:
+                num_layers_config = num_layers.Config(
+                    **sweep_dict,
+                    filename=f"num_layers_{id}_{threshold}.csv",
+                    threshold=threshold,
+                )
+                num_layers.main(
+                    num_layers_config, device, os.path.join(config.out, "num_layers")
+                )
 
         if config.entropy:
             print("> entropy")
@@ -172,7 +173,7 @@ sweeps: list[FigureSweep] = [
     FigureSweep(
         id="model_name",
         enabled=False,
-        model_name=[pythia_70m, pythia_160m, pythia_410m, pythia_1b],
+        model_name=[pythia_70m, pythia_160m, pythia_410m, pythia_1b, pythia_1_4b],
         expansion_factor=[64],
         k=[32],
         tuned_lens=False,
