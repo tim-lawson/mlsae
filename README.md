@@ -1,9 +1,7 @@
 # Multi-Layer Sparse Autoencoders (MLSAE)
 
-> [!NOTE]
-> This repository accompanies the preprint Residual Stream Analysis with
-> Multi-Layer SAEs (<https://arxiv.org/abs/2409.04185>).
-> See [References](#references) for related work.
+This repository accompanies the ICLR 2025 paper "Residual Stream Analysis with Multi-Layer SAEs" (<https://openreview.net/forum?id=XAjfjizaKs>, <https://arxiv.org/abs/2409.04185>).
+See [References](#references) for related work.
 
 ## Pretrained MLSAEs
 
